@@ -1,1 +1,0 @@
-document.getElementById('app').textContent = 'Popup is working 123'
