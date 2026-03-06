@@ -1,13 +1,17 @@
 import type { DebuggerEvent, VNode } from 'vue'
 import type { ExtendedComponentInstance, WatchEffects, TrackerDebuggerEvent } from '../types/vue-internals'
 import { trackSetupState } from './tracker'
+import { GraphNode, updateGraph  } from '../types/graph';
 
-export function traverse(instance: ExtendedComponentInstance): void {
-  console.log('--- instance name ----', instance.type.__name)
+export function traverse(instance: ExtendedComponentInstance, prevComponentName?: string | undefined): void {
+  const componentName = prevComponentName ? `${prevComponentName}.${instance?.type?.__name || 'Unknown'}` : instance?.type?.__name || 'Unknown';
+
+  const file = (instance.type as Record<string, unknown>).__file as string ?? ''
+  const nodes: GraphNode[] = [];
 
   const rawSetupState = instance.setupState?.['__v_raw']
   if (rawSetupState) {
-    trackSetupState(rawSetupState)
+    trackSetupState(rawSetupState, componentName, file, nodes)
   }
 
   const watchEffects = instance.scope?.effects.filter(
@@ -15,37 +19,51 @@ export function traverse(instance: ExtendedComponentInstance): void {
   )
 
   if (watchEffects && watchEffects.length > 0) {
-    watchEffects.forEach((effect: WatchEffects) => {
-      effect.__depList = new Map()
+    watchEffects.forEach((effect: WatchEffects, index: number) => {
+      const watchShortName = `w_${index}`
+      const watchNode: GraphNode = {
+        id: `${componentName}.${watchShortName}`,
+        type: 'watch',
+        val: null,
+        file,
+        deps: [],
+        subs: [],
+      }
+      nodes.push(watchNode)
+
       effect.onTrack = (event: DebuggerEvent) => {
         const trackerEvent = event.target as TrackerDebuggerEvent
-        const depName = trackerEvent.__tracker_name
+        const depName = trackerEvent.__tracker_name ?? (trackerEvent.$id ? String(event.key) : undefined)
+        if (!depName) return
 
-        if (depName) {
-          effect.__depList!.set(depName, depName)
-        } else if (trackerEvent.$id) {
-          effect.__depList!.set(String(event.key), String(event.key))
+        if (!watchNode.deps.includes(depName)) {
+          watchNode.deps.push(depName)
         }
 
-        const depListStr = Array.from(effect.__depList!.keys()).join(', ')
-        console.log(`[Vue Reactivity Tracker] watch(${depListStr})`)
+        const depNode = nodes.find(n => n.id === `${componentName}.${depName}`)
+        if (depNode && !depNode.subs.includes(watchShortName)) {
+          depNode.subs.push(watchShortName)
+        }
       }
-      effect.run() // 強制觸發一次 watch 來測試追蹤功能是否正常
+
+      effect.run()
     })
   }
 
+  updateGraph(componentName, nodes)
+
   // 繼續往下找子組件
-  walkVNode(instance.subTree)
+  walkVNode(instance.subTree, componentName)
 }
 
-export function walkVNode(vnode: VNode): void {
+export function walkVNode(vnode: VNode, prevComponentName?: string | undefined): void {
   if (!vnode) return
   if (vnode.component) {
-    traverse(vnode.component as ExtendedComponentInstance) // 遞迴
+    traverse(vnode.component as ExtendedComponentInstance, prevComponentName) // 遞迴
   }
   if (Array.isArray(vnode.children)) {
     vnode.children.forEach((child) => {
-      if (child && typeof child === 'object') walkVNode(child as VNode)
+      if (child && typeof child === 'object') walkVNode(child as VNode, prevComponentName)
     })
   }
 }

@@ -1,4 +1,4 @@
-import type { ComponentInternalInstance, VNode, EffectScope, ReactiveEffect } from 'vue'
+import type { ComponentInternalInstance, EffectScope, ReactiveEffect } from 'vue'
 import type { DebuggerEvent } from 'vue'
 
 // 被追蹤的響應式物件（ref、reactive、pinia store state）
@@ -21,9 +21,7 @@ export interface TrackEvent {
 //   // 我們自行附加的屬性
 //   __depList?: Map<string, string>
 // }
-export interface WatchEffects extends ReactiveEffect {
-   __depList?: Map<string, string>
-}
+export type WatchEffects = ReactiveEffect
 
 export type TrackerDebuggerEvent = DebuggerEvent & {
   __tracker_name?: string

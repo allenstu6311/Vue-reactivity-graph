@@ -1,38 +1,68 @@
-import type { RawSetupState, TrackEvent } from '../types/vue-internals'
+import { GraphNode } from "../types/graph";
+import type { ComputedRefImpl, RawSetupState, TrackEvent } from "../types/vue-internals";
 
-export function trackSetupState(rawSetupState: RawSetupState): void {
+function buildNode(key: string, val: ComputedRefImpl, componentName: string, file: string): GraphNode {
+  const id = `${componentName}.${key}`;
+
+  if (val?.fn) {
+    return { id, type: 'computed', val: val.value, file, deps: [], subs: [] };
+  }
+  if (val?._rawValue !== undefined) {
+    return { id, type: 'ref', val: val._rawValue, file, deps: [], subs: [] };
+  }
+  // reactive proxy — snapshot，過濾 Vue internal 和 __tracker_name
+  const snapshot = Object.fromEntries(
+    Object.entries(val as unknown as Record<string, unknown>)
+      .filter(([k]) => !k.startsWith('__v_') && k !== '__tracker_name')
+  );
+  return { id, type: 'reactive', val: snapshot, file, deps: [], subs: [] };
+}
+
+export function trackSetupState(
+  rawSetupState: RawSetupState,
+  componentName: string,
+  file: string,
+  nodes: GraphNode[],
+): void {
+  // Loop 1: 標記 __tracker_name，讓 onTrack 的 event.target 能識別變數
   for (const key in rawSetupState) {
-    const val = rawSetupState[key]
-    val.__tracker_name = key
+    const val = rawSetupState[key];
+    val.__tracker_name = key;
 
-    if (val._rawValue && typeof val._rawValue === 'object') {
-      val._rawValue.__tracker_name = key
+    if (val._rawValue && typeof val._rawValue === "object") {
+      val._rawValue.__tracker_name = key;
     }
   }
 
+  // Loop 2: 預先建好所有 nodes
   for (const key in rawSetupState) {
-    const val = rawSetupState[key]
+    nodes.push(buildNode(key, rawSetupState[key], componentName, file));
+  }
 
-    // 是 computed
+  // Loop 3: 對 computed 設 onTrack，找已存在的 node 更新 deps / subs
+  for (const key in rawSetupState) {
+    const val = rawSetupState[key];
+
     if (val?.fn) {
       val.onTrack = (event: TrackEvent) => {
-        // subscriber 的名稱：用 closure 捕捉的 key
-        const subscriberName = key
-        // dependency 的名稱：從之前標記的 __tracker_name 拿
-        const depName = event.target.__tracker_name
-        if (depName) {
-          console.log(`[Vue Reactivity Tracker] ${subscriberName} 追蹤了 ${depName}`)
-        } else if (event.target.$id) {
-          // pinia store 的 state 沒有 __tracker_name，但有 $id 可以辨識是哪個 store
-          console.log(`[Vue Reactivity Tracker] ${subscriberName} 追蹤了 ${String(event.key)}`)
-        }
-      }
+        const subscriberName = key;
+        const depName = event.target.__tracker_name || String(event.key);
 
-      // 強制觸發 computed 重新計算，來測試追蹤功能是否正常
-      val.flags |= 1 << 4  // 設 DIRTY
-      val.flags &= ~(1 << 7) // 清除 EVALUATED
-      val.globalVersion = -1  // 繞過 globalVersion fast path
-      val.value
+        const subNode = nodes.find(n => n.id === `${componentName}.${subscriberName}`);
+        if (subNode && !subNode.deps.includes(depName)) {
+          subNode.deps.push(depName);
+        }
+
+        const depNode = nodes.find(n => n.id === `${componentName}.${depName}`);
+        if (depNode && !depNode.subs.includes(subscriberName)) {
+          depNode.subs.push(subscriberName);
+        }
+      };
+
+      val.flags |= 1 << 4;
+      val.flags &= ~(1 << 7);
+      val.globalVersion = -1;
+      val.value;
     }
   }
 }
