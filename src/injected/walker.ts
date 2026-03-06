@@ -18,7 +18,7 @@ export function traverse(instance: ExtendedComponentInstance): void {
     watchEffects.forEach((effect: WatchEffects) => {
       effect.__depList = new Map()
       effect.onTrack = (event: DebuggerEvent) => {
-        const trackerEvent = event as TrackerDebuggerEvent
+        const trackerEvent = event.target as TrackerDebuggerEvent
         const depName = trackerEvent.__tracker_name
 
         if (depName) {
