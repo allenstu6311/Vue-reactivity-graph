@@ -9,7 +9,7 @@ export function traverse(instance: ExtendedComponentInstance, prevComponentName?
   const file = (instance.type as Record<string, unknown>).__name as string ?? '';
   const nodes: GraphNode[] = [];
 
-  const rawSetupState = instance.setupState?.['__v_raw']
+  const rawSetupState = instance.setupState?.['__v_raw'] || {}
   if (rawSetupState) {
     trackSetupState(rawSetupState, componentName, file, nodes)
   }
@@ -40,7 +40,7 @@ export function traverse(instance: ExtendedComponentInstance, prevComponentName?
           watchNode.deps.push(depName)
         }
 
-        const depNode = valNodeMap.get(event.target as object)
+        const depNode = valNodeMap.get(event.target as object) || valNodeMap.get(rawSetupState[depName] as object)
         if (depNode && !depNode.subs.includes(watchShortName)) {
           depNode.subs.push(watchShortName)
         }

@@ -38,7 +38,7 @@ if (app) {
         })),
       ])
     )
-    console.log('plain', plain)
+    // console.log('plain', plain)
     ;(window as unknown as Record<string, unknown>).__vueReactivityGraph = plain
   }
 

@@ -1,5 +1,5 @@
 import { GraphNode, notifyUpdate } from "../types/graph";
-import type { ComputedRefImpl, RawSetupState, TrackEvent } from "../types/vue-internals";
+import type { ComputedRefImpl, RawSetupState, TrackedTarget, TrackEvent } from "../types/vue-internals";
 
 // WeakMap：避免把 __node reference 直接掛在 Vue 物件上造成循環引用
 export const valNodeMap = new WeakMap<object, GraphNode>()
@@ -34,15 +34,8 @@ export function trackSetupState(
     const val = rawSetupState[key];
     val.__tracker_name = key;
 
-    if (val._rawValue && typeof val._rawValue === "object") {
-      val._rawValue.__tracker_name = key;
-    }
-
     const node = buildNode(key, val, componentName, file);
-    valNodeMap.set(val as object, node);
-    if (val._rawValue && typeof val._rawValue === "object") {
-      valNodeMap.set(val._rawValue as object, node);
-    }
+    valNodeMap.set(val, node);
     nodes.push(node);
   }
 
@@ -67,12 +60,13 @@ export function trackSetupState(
         //   subNode.deps = [];
         //   lastTrackId = val._trackId ?? -1;
         // }
-
         const depName = event.target.__tracker_name ?? String(event.key);
         if (!subNode.deps.includes(depName)) subNode.deps.push(depName);
 
-        const depNode = valNodeMap.get(event.target as object);
-        if (depNode && !depNode.subs.includes(key)) depNode.subs.push(key);
+        const depNode = valNodeMap.get(event.target as object) || valNodeMap.get(rawSetupState[depName] as object)
+        if (depNode && !depNode.subs.includes(key)) {
+          depNode.subs.push(key)
+        };
 
         notifyUpdate();
       };
