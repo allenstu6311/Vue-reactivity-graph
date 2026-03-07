@@ -1,12 +1,12 @@
 import type { DebuggerEvent, VNode } from 'vue'
 import type { ExtendedComponentInstance, WatchEffects, TrackerDebuggerEvent } from '../types/vue-internals'
-import { trackSetupState } from './tracker'
-import { GraphNode, updateGraph  } from '../types/graph';
+import { trackSetupState, valNodeMap } from './tracker'
+import { GraphNode, updateGraph, notifyUpdate } from '../types/graph';
 
 export function traverse(instance: ExtendedComponentInstance, prevComponentName?: string | undefined): void {
   const componentName = prevComponentName ? `${prevComponentName}.${instance?.type?.__name || 'Unknown'}` : instance?.type?.__name || 'Unknown';
 
-  const file = (instance.type as Record<string, unknown>).__file as string ?? ''
+  const file = (instance.type as Record<string, unknown>).__name as string ?? '';
   const nodes: GraphNode[] = [];
 
   const rawSetupState = instance.setupState?.['__v_raw']
@@ -40,10 +40,12 @@ export function traverse(instance: ExtendedComponentInstance, prevComponentName?
           watchNode.deps.push(depName)
         }
 
-        const depNode = nodes.find(n => n.id === `${componentName}.${depName}`)
+        const depNode = valNodeMap.get(event.target as object)
         if (depNode && !depNode.subs.includes(watchShortName)) {
           depNode.subs.push(watchShortName)
         }
+
+        notifyUpdate()
       }
 
       effect.run()

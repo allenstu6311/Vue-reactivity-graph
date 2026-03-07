@@ -5,6 +5,8 @@
   "action": {
     "default_popup": "popup.html"
   },
+  "devtools_page": "devtools.html",
+  "permissions": ["activeTab"],
   "content_scripts": [
     {
       "matches": ["<all_urls>"],

@@ -1,9 +1,11 @@
 import type { ComponentInternalInstance, EffectScope, ReactiveEffect } from 'vue'
 import type { DebuggerEvent } from 'vue'
+import type { GraphNode } from './graph'
 
 // 被追蹤的響應式物件（ref、reactive、pinia store state）
 export interface TrackedTarget {
   __tracker_name?: string
+  __node?: GraphNode
   $id?: string // pinia store 識別碼
   [key: string | symbol]: unknown
 }
@@ -34,6 +36,7 @@ export interface ComputedRefImpl {
   onTrack?: (event: TrackEvent) => void
   flags: number
   globalVersion: number
+  _trackId?: number
   value: unknown
   __tracker_name?: string
   _rawValue?: TrackedTarget | null

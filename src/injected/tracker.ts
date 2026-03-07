@@ -1,15 +1,20 @@
-import { GraphNode } from "../types/graph";
+import { GraphNode, notifyUpdate } from "../types/graph";
 import type { ComputedRefImpl, RawSetupState, TrackEvent } from "../types/vue-internals";
 
-function buildNode(key: string, val: ComputedRefImpl, componentName: string, file: string): GraphNode {
+// WeakMap：避免把 __node reference 直接掛在 Vue 物件上造成循環引用
+export const valNodeMap = new WeakMap<object, GraphNode>()
+
+function buildNode(key: string, val: ComputedRefImpl | any, componentName: string, file: string): GraphNode {
   const id = `${componentName}.${key}`;
 
   if (val?.fn) {
-    return { id, type: 'computed', val: val.value, file, deps: [], subs: [] };
+    return { id, type: 'computed', val, file, deps: [], subs: [] };
   }
-  if (val?._rawValue !== undefined) {
-    return { id, type: 'ref', val: val._rawValue, file, deps: [], subs: [] };
+
+  if (val?.dep) {
+    return { id, type: 'ref', val, file, deps: [], subs: [] };
   }
+
   // reactive proxy — snapshot，過濾 Vue internal 和 __tracker_name
   const snapshot = Object.fromEntries(
     Object.entries(val as unknown as Record<string, unknown>)
@@ -24,7 +29,7 @@ export function trackSetupState(
   file: string,
   nodes: GraphNode[],
 ): void {
-  // Loop 1: 標記 __tracker_name，讓 onTrack 的 event.target 能識別變數
+  // Loop 1: 標記 __tracker_name + 建 node + 存進 WeakMap
   for (const key in rawSetupState) {
     const val = rawSetupState[key];
     val.__tracker_name = key;
@@ -32,31 +37,44 @@ export function trackSetupState(
     if (val._rawValue && typeof val._rawValue === "object") {
       val._rawValue.__tracker_name = key;
     }
+
+    const node = buildNode(key, val, componentName, file);
+    valNodeMap.set(val as object, node);
+    if (val._rawValue && typeof val._rawValue === "object") {
+      valNodeMap.set(val._rawValue as object, node);
+    }
+    nodes.push(node);
   }
 
-  // Loop 2: 預先建好所有 nodes
-  for (const key in rawSetupState) {
-    nodes.push(buildNode(key, rawSetupState[key], componentName, file));
-  }
-
-  // Loop 3: 對 computed 設 onTrack，找已存在的 node 更新 deps / subs
+  // Loop 2: 對 computed 設 onTrack
   for (const key in rawSetupState) {
     const val = rawSetupState[key];
 
     if (val?.fn) {
+      // let lastTrackId = -1;
+
       val.onTrack = (event: TrackEvent) => {
-        const subscriberName = key;
-        const depName = event.target.__tracker_name || String(event.key);
+        const subNode = valNodeMap.get(val as object)!;
 
-        const subNode = nodes.find(n => n.id === `${componentName}.${subscriberName}`);
-        if (subNode && !subNode.deps.includes(depName)) {
-          subNode.deps.push(depName);
-        }
+        // 新一輪 run — 先清掉舊的 deps / subs
+        // if (val._trackId !== lastTrackId) {
+        //   subNode.deps.forEach(depName => {
+        //     const depNode = valNodeMap.get(rawSetupState[depName] as object);
+        //     if (depNode) {
+        //       depNode.subs = depNode.subs.filter(s => s !== key);
+        //     }
+        //   });
+        //   subNode.deps = [];
+        //   lastTrackId = val._trackId ?? -1;
+        // }
 
-        const depNode = nodes.find(n => n.id === `${componentName}.${depName}`);
-        if (depNode && !depNode.subs.includes(subscriberName)) {
-          depNode.subs.push(subscriberName);
-        }
+        const depName = event.target.__tracker_name ?? String(event.key);
+        if (!subNode.deps.includes(depName)) subNode.deps.push(depName);
+
+        const depNode = valNodeMap.get(event.target as object);
+        if (depNode && !depNode.subs.includes(key)) depNode.subs.push(key);
+
+        notifyUpdate();
       };
 
       val.flags |= 1 << 4;

@@ -16,6 +16,8 @@ export default defineConfig({
         injected: resolve(__dirname, 'src/injected/index.ts'),
         content: resolve(__dirname, 'src/content/index.ts'),
         popup: resolve(__dirname, 'popup.html'),
+        panel: resolve(__dirname, 'panel.html'),
+        devtools: resolve(__dirname, 'devtools.html'),
       },
       output: {
         entryFileNames: '[name].js',
