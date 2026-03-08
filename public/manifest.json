@@ -20,20 +20,3 @@
     }
   ]
 }
-
-// {
-//   "manifest_version": 3,
-//   "name": "Vue Reactivity Tracker",
-//   "version": "1.0",
-//   "action": {
-//     "default_popup": "popup.html"
-//   },
-//   "content_scripts": [
-//     {
-//       "matches": ["<all_urls>"],
-//       "js": ["injected.js"],
-//       "run_at": "document_start",
-//       "world": "MAIN"
-//     }
-//   ]
-// }

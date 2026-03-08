@@ -22,7 +22,10 @@ function fetchGraph() {
     'JSON.stringify(window.__vueReactivityGraph)',
     (result, err) => {
       if (err) { devLog('fetchGraph error', err); return }
-      if (typeof result !== 'string') { devLog('no graph data yet'); return }
+      if (typeof result !== 'string') { 
+        devLog('no graph data yet'); 
+        return 
+      }
       const data = JSON.parse(result) as ComponentGraph
       graph.value = data
       devLog('graph fetched, components:', Object.keys(data))
