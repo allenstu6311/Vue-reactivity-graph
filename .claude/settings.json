@@ -5,7 +5,11 @@
       "Bash(npm run build)",
       "Bash(pnpm add @vue-flow/core @dagrejs/dagre)",
       "Bash(pnpm add -D @types/dagre)",
-      "Bash(pnpm build)"
+      "Bash(pnpm build)",
+      "WebSearch",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(curl -s \"https://raw.githubusercontent.com/vuejs/devtools/main/packages/chrome-extension/src/background.ts\")"
     ]
   }
 }

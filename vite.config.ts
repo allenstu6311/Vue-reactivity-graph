@@ -15,6 +15,7 @@ export default defineConfig({
       input: {
         injected: resolve(__dirname, 'src/injected/index.ts'),
         content: resolve(__dirname, 'src/content/index.ts'),
+        background: resolve(__dirname, 'src/background/index.ts'),
         popup: resolve(__dirname, 'popup.html'),
         panel: resolve(__dirname, 'panel.html'),
         devtools: resolve(__dirname, 'devtools.html'),

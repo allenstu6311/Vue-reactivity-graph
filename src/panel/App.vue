@@ -23,12 +23,12 @@ function fetchGraph() {
     (result, err) => {
       if (err) { devLog('fetchGraph error', err); return }
       if (typeof result !== 'string') { 
-        devLog('no graph data yet'); 
+        // devLog('no graph data yet'); 
         return 
       }
       const data = JSON.parse(result) as ComponentGraph
       graph.value = data
-      devLog('graph fetched, components:', Object.keys(data))
+      // devLog('graph fetched, components:', Object.keys(data))
       if (!currentComp.value || !data[currentComp.value]) {
         currentComp.value = Object.keys(data)[0] ?? ''
       }
@@ -39,12 +39,13 @@ function fetchGraph() {
 onMounted(() => {
   fetchGraph()
   chrome.devtools.network.onNavigated.addListener(fetchGraph)
-})
 
-watch(() => graph.value, () => {
-  devLog('graphData', graph.value)
-  // fetchGraph()
-},{ deep: true})
+  const port = chrome.runtime.connect({ name: 'devtools-panel' })
+  port.onMessage.addListener((msg) => {
+    devLog('message from background:', msg)
+    if (msg.type === 'VUE_GRAPH_UPDATE') fetchGraph()
+  })
+})
 </script>
 
 <template>

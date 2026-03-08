@@ -10,7 +10,7 @@ export function buildLayout(
   allNodes: GraphNode[],
   selectedId: string,
 ): { nodes: Node[]; edges: Edge[] } {
-  devLog('buildLayout', { allNodes, selectedId })
+  // devLog('buildLayout', { allNodes, selectedId })
   const focused = allNodes.find(n => n.id === selectedId)
   if (!focused) return { nodes: [], edges: [] }
 

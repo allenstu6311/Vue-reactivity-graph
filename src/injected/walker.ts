@@ -52,10 +52,14 @@ export function traverse(instance: ExtendedComponentInstance, prevComponentName?
     })
   }
 
+
+
   updateGraph(componentName, nodes)
 
   // 繼續往下找子組件
   walkVNode(instance.subTree, componentName)
+
+    console.log('nodes', nodes)
 }
 
 export function walkVNode(vnode: VNode, prevComponentName?: string | undefined): void {
