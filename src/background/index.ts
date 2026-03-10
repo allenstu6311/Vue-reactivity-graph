@@ -11,6 +11,7 @@ chrome.runtime.onConnect.addListener((port) => {
 })
 
 chrome.runtime.onMessage.addListener((msg) => {
+  // console.log('msg', msg)
   if (msg.type !== 'VUE_GRAPH_UPDATE') return
   // console.log(`[background] forwarding VUE_GRAPH_UPDATE to ${panelPorts.size} panel(s)`)
   panelPorts.forEach((port) => port.postMessage({ type: 'VUE_GRAPH_UPDATE' }))

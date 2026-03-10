@@ -44,28 +44,11 @@ export function trackSetupState(
     const val = rawSetupState[key];
 
     if (val?.fn) {
-      // let lastTrackId = -1;
-
       val.onTrack = (event: TrackEvent) => {
         const subNode = valNodeMap.get(val as object)!;
-        // val._trackId = Math.random()*1000; // 每次 track 都給一個新的 id，代表這是一輪新的 track，和上次的 track 是不同的
 
-        // 新一輪 run — 先清掉舊的 deps / subs
-        // if (val._trackId !== lastTrackId) {
-        //   subNode.deps.forEach(depName => {
-        //     const depNode = valNodeMap.get(rawSetupState[depName] as object);
-        //     if (depNode) {
-        //       depNode.subs = depNode.subs.filter(s => s !== key);
-        //     }
-        //   });
-        //   subNode.deps = [];
-        //   lastTrackId = val._trackId ?? -1;
-        // }
         const depName = event.target.__tracker_name ?? String(event.key);
-     
-        console.log('tracked dep', depName)
         if (!subNode.deps.includes(depName)) subNode.deps.push(depName);
-           console.log('subNode.deps', subNode.deps)
 
         const depNode = valNodeMap.get(event.target as object) || valNodeMap.get(rawSetupState[depName] as object)
         if (depNode && !depNode.subs.includes(key)) {
@@ -74,10 +57,6 @@ export function trackSetupState(
 
         notifyUpdate();
       };
-
-      val.onTrigger = (event: TrackEvent) => {
-        console.log('onTrigger', event)
-      }
 
       val.flags |= 1 << 4;
       val.flags &= ~(1 << 7);
