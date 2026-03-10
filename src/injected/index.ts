@@ -45,6 +45,7 @@ if (app) {
           val: sanitizeVal(n.val, n.type),
           deps: n.deps,
           subs: n.subs,
+          varName: n.varName,
         })),
       ]),
     );

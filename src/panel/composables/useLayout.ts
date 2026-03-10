@@ -10,12 +10,10 @@ export function buildLayout(
   allNodes: GraphNode[],
   selectedId: string,
 ): { nodes: Node[]; edges: Edge[] } {
-  // devLog('buildLayout', { allNodes, selectedId })
   const focused = allNodes.find(n => n.id === selectedId)
   if (!focused) return { nodes: [], edges: [] }
 
-  const compPrefix = selectedId.split('.')[0]
-
+  const compPrefix = selectedId.split('.').slice(0, -1).join('.')
   function findNode(shortName: string): GraphNode | undefined {
     return allNodes.find(n => n.id === `${compPrefix}.${shortName}`)
   }
@@ -67,6 +65,5 @@ export function buildLayout(
       markerEnd: MarkerType.ArrowClosed,
     })),
   ]
-
   return { nodes: vfNodes, edges: vfEdges }
 }

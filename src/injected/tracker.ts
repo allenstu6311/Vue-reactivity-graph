@@ -6,21 +6,26 @@ export const valNodeMap = new WeakMap<object, GraphNode>()
 
 function buildNode(key: string, val: ComputedRefImpl | any, componentName: string, file: string): GraphNode {
   const id = `${componentName}.${key}`;
+  console.log('val', val)
 
   if (val?.fn) {
-    return { id, type: 'computed', val, file, deps: [], subs: [] };
+    return { id, varName: key, type: 'computed', val, file, deps: [], subs: [] };
   }
 
   if (val?.dep) {
-    return { id, type: 'ref', val, file, deps: [], subs: [] };
+    return { id, varName: key, type: 'ref', val, file, deps: [], subs: [] };
   }
+
+  // if(val?.setup){
+  //   return { id, varName: key, type: 'component', val, file, deps: [], subs: [] };
+  // }
 
   // reactive proxy — snapshot，過濾 Vue internal 和 __tracker_name
   const snapshot = Object.fromEntries(
     Object.entries(val as unknown as Record<string, unknown>)
       .filter(([k]) => !k.startsWith('__v_') && k !== '__tracker_name')
   );
-  return { id, type: 'reactive', val: snapshot, file, deps: [], subs: [] };
+  return { id, varName: key, type: 'reactive', val: snapshot, file, deps: [], subs: [] };
 }
 
 export function trackSetupState(

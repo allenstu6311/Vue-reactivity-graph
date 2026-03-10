@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { Handle, Position } from '@vue-flow/core'
 import type { GraphNode } from '../../types/graph'
+import { devLog } from '../utils';
 
 const props = defineProps<{
   data: GraphNode & { focused: boolean }
@@ -20,7 +21,7 @@ const displayName = computed(() => {
   if (props.data.type === 'watch') {
     return `watch(${(props.data.deps ?? []).join(', ')})`
   }
-  return props.data.id.split('.')[1]
+  return props.data.varName
 })
 
 function truncate(str: string, max: number) {
