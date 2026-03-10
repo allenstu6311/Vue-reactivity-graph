@@ -6,7 +6,6 @@ export const valNodeMap = new WeakMap<object, GraphNode>()
 
 function buildNode(key: string, val: ComputedRefImpl | any, componentName: string, file: string): GraphNode {
   const id = `${componentName}.${key}`;
-  console.log('val', val)
 
   if (val?.fn) {
     return { id, varName: key, type: 'computed', val, file, deps: [], subs: [] };

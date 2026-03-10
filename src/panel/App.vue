@@ -42,7 +42,6 @@ onMounted(() => {
 
   const port = chrome.runtime.connect({ name: 'devtools-panel' })
   port.onMessage.addListener((msg) => {
-    devLog('message from background:', msg)
     if (msg.type === 'VUE_GRAPH_UPDATE') fetchGraph()
   })
 })
