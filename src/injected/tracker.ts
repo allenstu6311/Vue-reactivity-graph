@@ -15,10 +15,10 @@ function buildNode(key: string, val: ComputedRefImpl | any, componentName: strin
     return { id, varName: key, type: 'ref', val, file, deps: [], subs: [] };
   }
 
-  // if(val?.setup){
-  //   return { id, varName: key, type: 'component', val, file, deps: [], subs: [] };
-  // }
-
+  if(val?.setup){
+    return { id, varName: key, type: 'component', val, file, deps: [], subs: [] };
+  }
+  
   // reactive proxy — snapshot，過濾 Vue internal 和 __tracker_name
   const snapshot = Object.fromEntries(
     Object.entries(val as unknown as Record<string, unknown>)

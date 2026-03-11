@@ -24,7 +24,7 @@ const TYPES = ['ref', 'reactive', 'computed', 'watch'] as const
 
 function displayName(n: GraphNode): string {
   if (n.type === 'watch') return `watch(${(n.deps ?? []).join(', ')})`
-  return n.varName
+  return n?.varName || ''
 }
 
 function getCount(n: GraphNode): number {

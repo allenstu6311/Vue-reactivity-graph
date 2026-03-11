@@ -1,8 +1,8 @@
-export type NodeType = 'ref' | 'reactive' | 'computed' | 'watch'
+export type NodeType = 'ref' | 'reactive' | 'computed' | 'watch' | 'component'
 
 export interface GraphNode {
   id: string       // `${componentName}.${varName}`，全域唯一
-  varName: string  // 變數短名
+  varName?: string  // 變數短名
   type: NodeType
   val: any
   file: string
