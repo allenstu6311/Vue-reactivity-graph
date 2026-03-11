@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { Handle, Position } from '@vue-flow/core'
 import type { GraphNode } from '../../types/graph'
-import { NODE_TYPE_META } from '../../types/graph'
+import { NODE_TYPE_META } from '../nodeTypeMeta'
 
 const props = defineProps<{
   data: GraphNode & { focused: boolean }

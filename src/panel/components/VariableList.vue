@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import type { GraphNode } from '../../types/graph'
-import { NODE_TYPE_META, NODE_TYPES } from '../../types/graph'
+import { NODE_TYPE_META, NODE_TYPES } from '../nodeTypeMeta'
 
 const props = defineProps<{
   nodes: GraphNode[]
