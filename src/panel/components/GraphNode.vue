@@ -2,20 +2,13 @@
 import { computed } from 'vue'
 import { Handle, Position } from '@vue-flow/core'
 import type { GraphNode } from '../../types/graph'
+import { NODE_TYPE_META } from '../../types/graph'
 
 const props = defineProps<{
   data: GraphNode & { focused: boolean }
 }>()
 
-const TYPE_CONFIG = {
-  ref:      { c: '#4ade80', bg: 'rgba(74,222,128,.08)',  bd: 'rgba(74,222,128,.28)',  label: 'ref' },
-  reactive: { c: '#fb923c', bg: 'rgba(251,146,60,.08)',  bd: 'rgba(251,146,60,.28)',  label: 'reactive' },
-  computed: { c: '#60a5fa', bg: 'rgba(96,165,250,.08)',  bd: 'rgba(96,165,250,.28)',  label: 'computed' },
-  watch:    { c: '#c084fc', bg: 'rgba(192,132,252,.08)', bd: 'rgba(192,132,252,.28)', label: 'watch' },
-  component: { c: '#c084fc', bg: 'rgba(192,132,252,.08)', bd: 'rgba(192,132,252,.28)', label: 'component' }
-}
-
-const tc = computed(() => TYPE_CONFIG[props.data.type])
+const tc = computed(() => NODE_TYPE_META[props.data.type])
 
 const displayName = computed(() => {
   if (props.data.type === 'watch') {
@@ -34,12 +27,12 @@ function truncate(str: string, max: number) {
   <div
     class="graph-node"
     :style="{
-      background: tc.bg,
-      border: `${data.focused ? 2 : 1.2}px solid ${tc.c}`,
-      boxShadow: data.focused ? `0 0 8px ${tc.c}` : 'none',
+      background: tc.background,
+      border: `${data.focused ? 2 : 1.2}px solid ${tc.color}`,
+      boxShadow: data.focused ? `0 0 8px ${tc.color}` : 'none',
     }"
   >
-    <div class="n-type" :style="{ color: data.focused ? tc.c : '#4a6080' }">
+    <div class="n-type" :style="{ color: data.focused ? tc.color : '#4a6080' }">
       {{ tc.label.toUpperCase() }}
     </div>
     <div class="n-name" :style="{ color: data.focused ? '#e8f4ff' : '#cdd9ee' }">

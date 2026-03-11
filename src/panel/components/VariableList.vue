@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import type { GraphNode } from '../../types/graph'
+import { NODE_TYPE_META, NODE_TYPES } from '../../types/graph'
 
 const props = defineProps<{
   nodes: GraphNode[]
@@ -13,14 +14,6 @@ const emit = defineEmits<{
 
 const search = ref('')
 
-const TYPE_CONFIG = {
-  ref:      { label: 'ref',      color: '#4ade80' },
-  reactive: { label: 'reactive', color: '#fb923c' },
-  computed: { label: 'computed', color: '#60a5fa' },
-  watch:    { label: 'watch',    color: '#c084fc' },
-} as const
-
-const TYPES = ['ref', 'reactive', 'computed', 'watch'] as const
 
 function displayName(n: GraphNode): string {
   if (n.type === 'watch') return `watch(${(n.deps ?? []).join(', ')})`
@@ -34,9 +27,9 @@ function getCount(n: GraphNode): number {
 
 const grouped = computed(() => {
   const q = search.value.toLowerCase()
-  return TYPES.map(type => ({
+  return NODE_TYPES.map(type => ({
     type,
-    config: TYPE_CONFIG[type],
+    config: NODE_TYPE_META[type],
     items: props.nodes.filter(
       n => n.type === type && displayName(n).toLowerCase().includes(q),
     ),
