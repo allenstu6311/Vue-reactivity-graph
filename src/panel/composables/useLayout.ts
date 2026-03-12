@@ -1,8 +1,6 @@
 import dagre from '@dagrejs/dagre'
 import type { GraphNode } from '../../types/graph'
 import { type Node, type Edge, MarkerType } from '@vue-flow/core'
-import { devLog } from '../utils'
-
 const NW = 148
 const NH = 66
 
@@ -25,7 +23,26 @@ export function buildLayout(
   const seen = new Set<string>([focused.id])
   const uniqueDeps = depNodes.filter(n => !seen.has(n.id) && seen.add(n.id))
   const uniqueSubs = subNodes.filter(n => !seen.has(n.id) && seen.add(n.id))
-  const graphNodes = [focused, ...uniqueDeps, ...uniqueSubs]
+
+  // BFS 往 subs 方向展開（computed 會繼續往下，watch 自然停止）
+  const downstreamNodes: GraphNode[] = []
+  const downstreamEdges: [string, string][] = []
+  const queue = [...uniqueSubs]
+  while (queue.length > 0) {
+    const node = queue.shift()!
+    for (const subName of node.subs ?? []) {
+      const sub = findNode(subName)
+      if (!sub) continue
+      downstreamEdges.push([node.id, sub.id])
+      if (!seen.has(sub.id)) {
+        seen.add(sub.id)
+        downstreamNodes.push(sub)
+        queue.push(sub)
+      }
+    }
+  }
+
+  const graphNodes = [focused, ...uniqueDeps, ...uniqueSubs, ...downstreamNodes]
 
   // Build dagre graph
   const g = new dagre.graphlib.Graph()
@@ -35,6 +52,7 @@ export function buildLayout(
   graphNodes.forEach(n => g.setNode(n.id, { width: NW, height: NH }))
   uniqueDeps.forEach(n => g.setEdge(n.id, focused.id))
   uniqueSubs.forEach(n => g.setEdge(focused.id, n.id))
+  downstreamEdges.forEach(([src, tgt]) => g.setEdge(src, tgt))
 
   dagre.layout(g)
 
@@ -49,9 +67,8 @@ export function buildLayout(
   })
 
   const vfEdges: Edge[] = [
-    // computed如果被依賴了，會同時出現在deps和subs裡（因為它既是被依賴者也是依賴者），所以會有重複邊，這裡用uniqueDeps/subs過濾掉重複的
     ...uniqueDeps.map(n => ({
-      id: `${n.id}-${focused.id}`,
+      id: `${n.id}->${focused.id}`,
       source: n.id,
       target: focused.id,
       type: 'smoothstep',
@@ -64,6 +81,14 @@ export function buildLayout(
       type: 'smoothstep',
       markerEnd: MarkerType.ArrowClosed,
     })),
+    ...downstreamEdges.map(([src, tgt]) => ({
+      id: `${src}->${tgt}`,
+      source: src,
+      target: tgt,
+      type: 'smoothstep',
+      markerEnd: MarkerType.ArrowClosed,
+    })),
   ]
+
   return { nodes: vfNodes, edges: vfEdges }
 }

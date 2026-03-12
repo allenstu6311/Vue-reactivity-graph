@@ -24,6 +24,9 @@ function truncate(str: string, max: number) {
 
 <template>
   <Handle type="target" :position="Position.Left" />
+    <!-- <Handle type="target" :position="Position.Top" />
+  <Handle type="target" :position="Position.Bottom" />
+  <Handle type="source" :position="Position.Right" /> -->
   <div
     class="graph-node"
     :style="{
@@ -44,6 +47,9 @@ function truncate(str: string, max: number) {
     </div>
   </div>
   <Handle type="source" :position="Position.Right" />
+  <!-- <Handle type="source" :position="Position.Left" />
+  <Handle type="source" :position="Position.Bottom" />
+  <Handle type="target" :position="Position.Top" /> -->
 </template>
 
 <style scoped>

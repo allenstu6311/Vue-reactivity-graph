@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { getSmoothStepPath, VueFlow } from '@vue-flow/core'
+import { VueFlow } from '@vue-flow/core'
 import GraphNode from './GraphNode.vue'
 import { buildLayout } from '../composables/useLayout'
 import type { GraphNode as GNode } from '../../types/graph'
