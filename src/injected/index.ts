@@ -26,6 +26,7 @@ if (app) {
     switch (type) {
       case "ref":
       case "computed":
+      case "store":
         return (val as any)?._value;
       case "reactive":
         return { ...(val as object) };
@@ -39,13 +40,8 @@ if (app) {
       Object.entries(graph).map(([comp, nodes]) => [
         comp,
         nodes.map((n) => ({
-          id: n.id,
-          type: n.type,
-          file: n.file,
+          ...n,
           val: sanitizeVal(n.val, n.type),
-          deps: n.deps,
-          subs: n.subs,
-          varName: n.varName,
         })),
       ]),
     );

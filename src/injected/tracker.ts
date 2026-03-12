@@ -11,6 +11,11 @@ function buildNode(key: string, val: ComputedRefImpl | any, componentName: strin
     return { id, varName: key, type: 'computed', val, file, deps: [], subs: [] };
   }
 
+  // store
+  if(val?._key){
+    return { id, varName: key, type: 'store', val, file, deps: [], subs: [] };    
+  }
+
   if (val?.dep) {
     return { id, varName: key, type: 'ref', val, file, deps: [], subs: [] };
   }
