@@ -44,7 +44,7 @@ export function traverse(
         subs: [],
       }
       nodes.push(propNode)
-
+      console.log('rawSetupState',rawSetupState)
       const parentNode = valNodeMap.get(parentVal)
       if (parentNode) {
         propNode.deps.push(parentNode.id)
@@ -107,7 +107,7 @@ export function traverse(
 
   // 繼續往下找子組件
   walkVNode(instance.subTree, componentName);
-  console.log('nodes', nodes)
+  // console.log('nodes', nodes)
 }
 
 export function walkVNode(
