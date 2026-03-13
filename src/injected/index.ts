@@ -61,6 +61,7 @@ if (app) {
   }
 
   hook.emit = function (event: string, ...args: any[]) {
+    // console.log("hook event", event, args);
     if (event === "component:added" && pendingReloadId !== null) {
       const [app, uid, parentUid, instance] = args;
       // 比對 __hmrId 確認是同一個 component

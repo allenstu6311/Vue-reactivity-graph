@@ -1,4 +1,4 @@
-export type NodeType = 'ref' | 'reactive' | 'computed' | 'watch' | 'component' | 'store'
+export type NodeType = 'ref' | 'reactive' | 'computed' | 'watch' | 'component' | 'store' | 'prop'
 
 export interface GraphNode {
   id: string       // `${componentName}.${varName}`，全域唯一

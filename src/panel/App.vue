@@ -11,6 +11,7 @@ const selectedId = ref<string | null>(null)
 
 const compOptions = computed(() => Object.keys(graph.value))
 const currentNodes = computed(() => graph.value[currentComp.value] ?? [])
+const allNodes = computed(() => Object.values(graph.value).flat())
 
 function onSwitchComp(comp: string) {
   currentComp.value = comp
@@ -76,7 +77,7 @@ onMounted(() => {
 
       <!-- RIGHT: graph -->
       <div class="right">
-        <GraphView :nodes="currentNodes" :selected-id="selectedId" />
+        <GraphView :nodes="allNodes" :selected-id="selectedId" />
       </div>
     </div>
   </div>

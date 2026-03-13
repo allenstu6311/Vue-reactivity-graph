@@ -12,8 +12,9 @@ export function buildLayout(
   if (!focused) return { nodes: [], edges: [] }
 
   const compPrefix = selectedId.split('.').slice(0, -1).join('.')
-  function findNode(shortName: string): GraphNode | undefined {
-    return allNodes.find(n => n.id === `${compPrefix}.${shortName}`)
+  function findNode(nameOrId: string): GraphNode | undefined {
+    return allNodes.find(n => n.id === nameOrId)
+      ?? allNodes.find(n => n.id === `${compPrefix}.${nameOrId}`)
   }
 
   const depNodes = (focused.deps ?? []).map(findNode).filter(Boolean) as GraphNode[]

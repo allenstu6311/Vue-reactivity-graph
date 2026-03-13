@@ -4,9 +4,10 @@ import type { ComputedRefImpl, RawSetupState, TrackedTarget, TrackEvent } from "
 // WeakMap：避免把 __node reference 直接掛在 Vue 物件上造成循環引用
 export const valNodeMap = new WeakMap<object, GraphNode>()
 
+
 function buildNode(key: string, val: ComputedRefImpl | any, componentName: string, file: string): GraphNode {
   const id = `${componentName}.${key}`;
-
+  // console.log('val', val)
   if (val?.fn) {
     return { id, varName: key, type: 'computed', val, file, deps: [], subs: [] };
   }
@@ -29,6 +30,7 @@ function buildNode(key: string, val: ComputedRefImpl | any, componentName: strin
     Object.entries(val as unknown as Record<string, unknown>)
       .filter(([k]) => !k.startsWith('__v_') && k !== '__tracker_name')
   );
+
   return { id, varName: key, type: 'reactive', val: snapshot, file, deps: [], subs: [] };
 }
 
@@ -38,6 +40,7 @@ export function trackSetupState(
   file: string,
   nodes: GraphNode[],
 ): void {
+  console.log('rawSetupState', rawSetupState)
   // Loop 1: 標記 __tracker_name + 建 node + 存進 WeakMap
   for (const key in rawSetupState) {
     const val = rawSetupState[key];
@@ -55,17 +58,26 @@ export function trackSetupState(
     if (val?.fn) {
       val.onTrack = (event: TrackEvent) => {
         const subNode = valNodeMap.get(val as object)!;
-
+        console.log('subNode', subNode)
+        console.log('event', event)
         const depName = event.target.__tracker_name ?? String(event.key);
         if (!subNode.deps.includes(depName)) subNode.deps.push(depName);
 
-        const depNode = valNodeMap.get(event.target as object) || valNodeMap.get(rawSetupState[depName] as object)
-        if (depNode && !depNode.subs.includes(key)) {
-          depNode.subs.push(key)
-        };
+        const depNode = valNodeMap.get(event.target as object)
+          || valNodeMap.get(rawSetupState[depName] as object)
+          || nodes.find(n => n.varName === depName && n.type === 'prop')
+
+        if (depNode) {
+          const subName = depNode.type === 'prop' ? `${componentName}.${key}` : key
+          if (!depNode.subs.includes(subName)) depNode.subs.push(subName)
+        }
 
         notifyUpdate();
       };
+
+      // val.onTrigger = (event: TrackEvent) => {
+      //   console.log('trigger event', event)
+      // }
 
       val.flags |= 1 << 4;
       val.flags &= ~(1 << 7);
