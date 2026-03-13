@@ -1,4 +1,4 @@
-import { traverse } from "./walker";
+import { collectInstance, triggerInstance } from "./walker";
 import type { ExtendedComponentInstance } from "../types/vue-internals";
 import { getGraph, setOnUpdate } from "../types/graph";
 import type { NodeType } from "../types/graph";
@@ -66,7 +66,8 @@ if (app) {
       const [app, uid, parentUid, instance] = args;
       // 比對 __hmrId 確認是同一個 component
       if (instance?.type?.__hmrId === pendingReloadId) {
-        traverse(instance);
+        collectInstance(instance);
+        triggerInstance(instance);
         refreshGraph();
         pendingReloadId = null;
       }
@@ -75,6 +76,7 @@ if (app) {
   };
 
   setOnUpdate(refreshGraph);
-  traverse(app);
+  collectInstance(app);
+  triggerInstance(app);
   refreshGraph();
 }

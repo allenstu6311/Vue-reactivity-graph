@@ -4,79 +4,138 @@ import type {
   WatchEffects,
   TrackerDebuggerEvent,
 } from "../types/vue-internals";
-import { trackSetupState, valNodeMap } from "./tracker";
-import { GraphNode, updateGraph, notifyUpdate } from "../types/graph";
+import {
+  collectSetupState,
+  bindSetupTrack,
+  valNodeMap,
+  propKeyNodeMap,
+} from "./tracker";
+import { GraphNode, updateGraph, getGraph, notifyUpdate } from "../types/graph";
 
-export function traverse(
+// Phase 1: 蒐集所有節點，不觸發任何訂閱者
+export function collectInstance(
   instance: ExtendedComponentInstance,
-  prevComponentName?: string | undefined,
+  prevComponentName?: string,
 ): void {
   const componentName = prevComponentName
     ? `${prevComponentName}.${instance?.type?.__name || "Unknown"}`
     : instance?.type?.__name || "Unknown";
-  // console.log("instance", instance);
   const file =
     ((instance.type as Record<string, unknown>).__name as string) ?? "";
   const nodes: GraphNode[] = [];
 
   const rawSetupState = instance.setupState?.["__v_raw"] || {};
-
-  /**
-   * #issue
-   * 須自己處理 parent setupState 的型別
-   */
   const parentRawSetupState = instance.parent?.setupState?.["__v_raw"];
   const propsOptions = instance.propsOptions?.[0];
 
-  // Props 追蹤：在 trackSetupState 前執行，此時父層 node 仍在 valNodeMap 可查到
-  if (propsOptions && parentRawSetupState) {
+  // Props 追蹤：建 prop nodes + 存進 propKeyNodeMap
+  if (propsOptions) {
+    const rawPropsObj = ((instance.props as any).__v_raw ??
+      instance.props) as object;
+    const propMap = new Map<string, GraphNode>();
+    propKeyNodeMap.set(rawPropsObj, propMap);
+
     for (const propKey in propsOptions) {
-      const parentVal = parentRawSetupState[propKey]
-      if (!parentVal || typeof parentVal !== 'object') continue
-      // console.log('parentVal', parentVal)
       const propNode: GraphNode = {
         id: `${componentName}.${propKey}`,
         varName: propKey,
-        type: 'prop',
+        type: "prop",
         val: (instance.props as Record<string, unknown>)[propKey],
         file,
         deps: [],
         subs: [],
-      }
-      nodes.push(propNode)
-      console.log('rawSetupState',rawSetupState)
-      const parentNode = valNodeMap.get(parentVal)
-      if (parentNode) {
-        propNode.deps.push(parentNode.id)
-        if (!parentNode.subs.includes(propNode.id)) {
-          console.log('propNode', propNode);
-          console.log('parentNode', parentNode);
-          parentNode.subs.push(propNode.id)
+      };
+      nodes.push(propNode);
+      propMap.set(propKey, propNode);
+
+      // 連結父層 node（父層已在 Phase 1 先被蒐集）
+      if (parentRawSetupState) {
+        const parentVal = parentRawSetupState[propKey];
+        if (parentVal && typeof parentVal === "object") {
+          const parentNode = valNodeMap.get(parentVal);
+          if (parentNode) {
+            propNode.deps.push(parentNode.id);
+            // console.log('parentNode', parentNode)
+            // console.log('propNode', propNode)
+            if (!parentNode.subs.includes(propNode.id)) {
+              parentNode.subs.push(propNode.id);
+            }
+          }
         }
       }
     }
   }
 
   if (rawSetupState) {
-    trackSetupState(rawSetupState, componentName, file, nodes);
+    collectSetupState(rawSetupState, componentName, file, nodes);
   }
 
+  // 建 watch nodes（不觸發 effect）
   const watchEffects = instance.scope?.effects.filter(
-    (e) => e !== instance.effect, // 過濾掉 component effect，因為它不是 watch 的 effect
+    (e) => e !== instance.effect,
   );
 
   if (watchEffects && watchEffects.length > 0) {
-    watchEffects.forEach((effect: WatchEffects, index: number) => {
-      const watchShortName = `w_${index}`;
-      const watchNode: GraphNode = {
-        id: `${componentName}.${watchShortName}`,
+    watchEffects.forEach((_effect: WatchEffects, index: number) => {
+      nodes.push({
+        id: `${componentName}.w_${index}`,
+        varName: `w_${index}`,
         type: "watch",
         val: null,
         file,
         deps: [],
         subs: [],
-      };
-      nodes.push(watchNode);
+      });
+    });
+  }
+
+  updateGraph(componentName, nodes);
+  collectVNode(instance.subTree, componentName);
+}
+
+export function collectVNode(vnode: VNode, prevComponentName?: string): void {
+  if (!vnode) return;
+  if (vnode.component) {
+    collectInstance(
+      vnode.component as ExtendedComponentInstance,
+      prevComponentName,
+    );
+  }
+  if (Array.isArray(vnode.children)) {
+    vnode.children.forEach((child) => {
+      if (child && typeof child === "object")
+        collectVNode(child as VNode, prevComponentName);
+    });
+  }
+}
+
+// Phase 2: 觸發所有訂閱者，此時所有 node 已蒐集完畢
+export function triggerInstance(
+  instance: ExtendedComponentInstance,
+  prevComponentName?: string,
+): void {
+  const componentName = prevComponentName
+    ? `${prevComponentName}.${instance?.type?.__name || "Unknown"}`
+    : instance?.type?.__name || "Unknown";
+
+  const rawSetupState = instance.setupState?.["__v_raw"] || {};
+  const nodes = getGraph()[componentName] ?? [];
+
+  if (rawSetupState) {
+    bindSetupTrack(rawSetupState, componentName);
+  }
+
+  const watchEffects = instance.scope?.effects.filter(
+    (e) => e !== instance.effect,
+  );
+
+  if (watchEffects && watchEffects.length > 0) {
+    watchEffects.forEach((effect: WatchEffects, index: number) => {
+      const watchShortName = `w_${index}`;
+      const watchNode = nodes.find(
+        (n) => n.type === "watch" && n.varName === watchShortName,
+      );
+      if (!watchNode) return;
 
       effect.onTrack = (event: DebuggerEvent) => {
         const trackerEvent = event.target as TrackerDebuggerEvent;
@@ -91,7 +150,9 @@ export function traverse(
 
         const depNode =
           valNodeMap.get(event.target as object) ||
-          valNodeMap.get(rawSetupState[depName] as object);
+          valNodeMap.get(rawSetupState[depName] as object) ||
+          propKeyNodeMap.get(event.target as object)?.get(String(event.key));
+
         if (depNode && !depNode.subs.includes(watchShortName)) {
           depNode.subs.push(watchShortName);
         }
@@ -103,25 +164,21 @@ export function traverse(
     });
   }
 
-  updateGraph(componentName, nodes);
-
-  // 繼續往下找子組件
-  walkVNode(instance.subTree, componentName);
-  // console.log('nodes', nodes)
+  triggerVNode(instance.subTree, componentName);
 }
 
-export function walkVNode(
-  vnode: VNode,
-  prevComponentName?: string | undefined,
-): void {
+export function triggerVNode(vnode: VNode, prevComponentName?: string): void {
   if (!vnode) return;
   if (vnode.component) {
-    traverse(vnode.component as ExtendedComponentInstance, prevComponentName); // 遞迴
+    triggerInstance(
+      vnode.component as ExtendedComponentInstance,
+      prevComponentName,
+    );
   }
   if (Array.isArray(vnode.children)) {
     vnode.children.forEach((child) => {
       if (child && typeof child === "object")
-        walkVNode(child as VNode, prevComponentName);
+        triggerVNode(child as VNode, prevComponentName);
     });
   }
 }

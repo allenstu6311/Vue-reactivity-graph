@@ -8,6 +8,8 @@ import type {
 
 // WeakMap：避免把 __node reference 直接掛在 Vue 物件上造成循環引用
 export const valNodeMap = new WeakMap<object, GraphNode>();
+// WeakMap：props raw object → Map<propKey, GraphNode>
+export const propKeyNodeMap = new WeakMap<object, Map<string, GraphNode>>();
 
 function buildNode(
   key: string,
@@ -18,18 +20,9 @@ function buildNode(
   const id = `${componentName}.${key}`;
 
   if (val?.fn) {
-    return {
-      id,
-      varName: key,
-      type: "computed",
-      val,
-      file,
-      deps: [],
-      subs: [],
-    };
+    return { id, varName: key, type: "computed", val, file, deps: [], subs: [] };
   }
 
-  // store
   if (val?._key) {
     return { id, varName: key, type: "store", val, file, deps: [], subs: [] };
   }
@@ -39,15 +32,7 @@ function buildNode(
   }
 
   if (val?.setup) {
-    return {
-      id,
-      varName: key,
-      type: "component",
-      val,
-      file,
-      deps: [],
-      subs: [],
-    };
+    return { id, varName: key, type: "component", val, file, deps: [], subs: [] };
   }
 
   // reactive proxy — snapshot，過濾 Vue internal 和 __tracker_name
@@ -57,25 +42,17 @@ function buildNode(
     ),
   );
 
-  return {
-    id,
-    varName: key,
-    type: "reactive",
-    val: snapshot,
-    file,
-    deps: [],
-    subs: [],
-  };
+  return { id, varName: key, type: "reactive", val: snapshot, file, deps: [], subs: [] };
 }
 
-export function trackSetupState(
+// Phase 1: 建 node、存 valNodeMap
+export function collectSetupState(
   rawSetupState: RawSetupState,
   componentName: string,
   file: string,
   nodes: GraphNode[],
 ): void {
   console.log("rawSetupState", rawSetupState);
-  // Loop 1: 標記 __tracker_name + 建 node + 存進 WeakMap
   for (const key in rawSetupState) {
     if (key === "props") continue;
     const val = rawSetupState[key];
@@ -85,24 +62,29 @@ export function trackSetupState(
     valNodeMap.set(val, node);
     nodes.push(node);
   }
+}
 
-  // Loop 2: 對 computed 設 onTrack
+// Phase 2: 設 onTrack + 觸發 computed
+export function bindSetupTrack(
+  rawSetupState: RawSetupState,
+  componentName: string,
+): void {
   for (const key in rawSetupState) {
     const val = rawSetupState[key];
 
     if (val?.fn) {
       val.onTrack = (event: TrackEvent) => {
         const subNode = valNodeMap.get(val as object)!;
+        console.log('event', event);
         console.log("subNode", subNode);
-        // console.log("event", event);
         const depName = event.target.__tracker_name ?? String(event.key);
         if (!subNode.deps.includes(depName)) subNode.deps.push(depName);
 
         const depNode =
           valNodeMap.get(event.target as object) ||
           valNodeMap.get(rawSetupState[depName] as object) ||
-          nodes.find((n) => n.varName === depName && n.type === "prop");
-        console.log('depNode', depNode)
+          propKeyNodeMap.get(event.target as object)?.get(String(event.key));
+        console.log('depNode', depNode);
         if (depNode) {
           const subName =
             depNode.type === "prop" ? `${componentName}.${key}` : key;
@@ -111,10 +93,6 @@ export function trackSetupState(
 
         notifyUpdate();
       };
-
-      // val.onTrigger = (event: TrackEvent) => {
-      //   console.log('trigger event', event)
-      // }
 
       val.flags |= 1 << 4;
       val.flags &= ~(1 << 7);
