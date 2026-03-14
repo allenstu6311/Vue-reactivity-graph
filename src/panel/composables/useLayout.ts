@@ -25,6 +25,24 @@ export function buildLayout(
   const uniqueDeps = depNodes.filter(n => !seen.has(n.id) && seen.add(n.id))
   const uniqueSubs = subNodes.filter(n => !seen.has(n.id) && seen.add(n.id))
 
+  // BFS 往 deps 方向展開
+  const upstreamNodes: GraphNode[] = []
+  const upstreamEdges: [string, string][] = []
+  const upQueue = [...uniqueDeps]
+  while (upQueue.length > 0) {
+    const node = upQueue.shift()!
+    for (const depName of node.deps ?? []) {
+      const dep = findNode(depName)
+      if (!dep) continue
+      upstreamEdges.push([dep.id, node.id])
+      if (!seen.has(dep.id)) {
+        seen.add(dep.id)
+        upstreamNodes.push(dep)
+        upQueue.push(dep)
+      }
+    }
+  }
+
   // BFS 往 subs 方向展開（computed 會繼續往下，watch 自然停止）
   const downstreamNodes: GraphNode[] = []
   const downstreamEdges: [string, string][] = []
@@ -43,7 +61,7 @@ export function buildLayout(
     }
   }
 
-  const graphNodes = [focused, ...uniqueDeps, ...uniqueSubs, ...downstreamNodes]
+  const graphNodes = [focused, ...upstreamNodes, ...uniqueDeps, ...uniqueSubs, ...downstreamNodes]
 
   // Build dagre graph
   const g = new dagre.graphlib.Graph()
@@ -51,6 +69,7 @@ export function buildLayout(
   g.setDefaultEdgeLabel(() => ({}))
 
   graphNodes.forEach(n => g.setNode(n.id, { width: NW, height: NH }))
+  upstreamEdges.forEach(([src, tgt]) => g.setEdge(src, tgt))
   uniqueDeps.forEach(n => g.setEdge(n.id, focused.id))
   uniqueSubs.forEach(n => g.setEdge(focused.id, n.id))
   downstreamEdges.forEach(([src, tgt]) => g.setEdge(src, tgt))
@@ -68,6 +87,13 @@ export function buildLayout(
   })
 
   const vfEdges: Edge[] = [
+    ...upstreamEdges.map(([src, tgt]) => ({
+      id: `${src}->${tgt}`,
+      source: src,
+      target: tgt,
+      type: 'smoothstep',
+      markerEnd: MarkerType.ArrowClosed,
+    })),
     ...uniqueDeps.map(n => ({
       id: `${n.id}->${focused.id}`,
       source: n.id,

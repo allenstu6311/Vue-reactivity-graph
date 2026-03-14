@@ -12,8 +12,69 @@ import {
 } from "./tracker";
 import { GraphNode, updateGraph, getGraph, notifyUpdate } from "../types/graph";
 
-// parent render 時存取了哪些 setupState key → rawVal（供子層 prop 連結使用）
-const instancePropAccessLog = new WeakMap<object, Map<string, object>>();
+// parent sentinel dry-run 建立的 childType → propName → parentSetupKey 對應
+const instanceChildPropKeyMap = new WeakMap<
+  object,
+  Map<object, Map<string, string>>
+>();
+
+// 遍歷 dry-run VNode tree，找出子元件 props 中的 sentinel symbol
+function traverseVNodeForSentinels(
+  vnode: any,
+  sentinelToKey: Map<symbol, string>,
+  rawSetupState: object,
+  result: Map<object, Map<string, string>>,
+): void {
+  if (!vnode || typeof vnode !== "object") return;
+
+  if (vnode.type && vnode.props) {
+    // vnode.type 本身可能也是 sentinel（component 定義在 setupState 裡）
+    // 需要還原回真實的 component object
+    let resolvedType: unknown = vnode.type;
+    if (typeof vnode.type === "symbol" && sentinelToKey.has(vnode.type)) {
+      const keyName = sentinelToKey.get(vnode.type)!;
+      resolvedType = (rawSetupState as any)[keyName];
+    }
+
+    if (resolvedType && typeof resolvedType === "object") {
+      const propMap = new Map<string, string>();
+      for (const [propName, val] of Object.entries(
+        vnode.props as Record<string, unknown>,
+      )) {
+        if (typeof val === "symbol" && sentinelToKey.has(val)) {
+          propMap.set(propName, sentinelToKey.get(val)!);
+        }
+      }
+      if (propMap.size > 0) {
+        result.set(resolvedType as object, propMap);
+      }
+    }
+  }
+
+  // 遞迴 children
+  const children = vnode.children;
+  if (Array.isArray(children)) {
+    for (const child of children) {
+      traverseVNodeForSentinels(child, sentinelToKey, rawSetupState, result);
+    }
+  } else if (children && typeof children === "object") {
+    // Slots
+    for (const slotFn of Object.values(children)) {
+      if (typeof slotFn === "function") {
+        try {
+          const slotVNodes = (slotFn as () => unknown)();
+          if (Array.isArray(slotVNodes)) {
+            for (const sv of slotVNodes) {
+              traverseVNodeForSentinels(sv, sentinelToKey, rawSetupState, result);
+            }
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+}
 
 // Phase 1: 蒐集所有節點，不觸發任何訂閱者
 export function collectInstance(
@@ -28,24 +89,6 @@ export function collectInstance(
   const nodes: GraphNode[] = [];
 
   const rawSetupState = instance.setupState?.["__v_raw"] || {};
-
-  // 在開頭裝 recording proxy（不恢復，讓後續 Vue 自然 re-render 也能捕捉）
-  const accessLog = new Map<string, object>();
-  instancePropAccessLog.set(instance, accessLog);
-  if ((instance as any).render && Object.keys(rawSetupState).length > 0) {
-    const recordProxy = new Proxy(instance.setupState as object, {
-      get(target, key, receiver) {
-        if (typeof key === "string" && !key.startsWith("__v_")) {
-          const raw = (rawSetupState as any)[key];
-          if (raw && typeof raw === "object") {
-            accessLog.set(key, raw);
-          }
-        }
-        return Reflect.get(target, key, receiver);
-      },
-    });
-    instance.setupState = recordProxy as any;
-  }
 
   const parentRawSetupState = instance.parent?.setupState?.["__v_raw"];
   const propsOptions = instance.propsOptions?.[0];
@@ -71,10 +114,6 @@ export function collectInstance(
       propMap.set(propKey, propNode);
 
       // 連結父層 node（父層已在 Phase 1 先被蒐集）
-      const vnodePropVal = (instance.vnode?.props as any)?.[propKey];
-      const parentAccessLog = instance.parent
-        ? instancePropAccessLog.get(instance.parent)
-        : undefined;
       let parentNode: GraphNode | undefined;
 
       // Strategy 1: 同名查找（適用所有同名 prop，包含 ref / reactive）
@@ -85,19 +124,19 @@ export function collectInstance(
         }
       }
 
-      // Strategy 2: accessLog 查找（適用不同名 prop）
-      // - reactive 直接 identity match
-      // - ref({...}) 透過 _value identity match（唯一）
-      // - ref(primitive) 透過 _value value match（可能有 collision）
-      if (!parentNode && vnodePropVal !== undefined && parentAccessLog) {
-        for (const [, rawVal] of parentAccessLog) {
-          if (
-            rawVal === vnodePropVal ||
-            (rawVal as any)?._value === vnodePropVal
-          ) {
-            parentNode = valNodeMap.get(rawVal);
-            if (parentNode) break;
-          }
+      // Strategy 2: sentinel dry-run prop map（適用不同名 prop）
+      if (!parentNode) {
+        const parentChildPropMap = instance.parent
+          ? instanceChildPropKeyMap.get(instance.parent)
+          : undefined;
+
+        const sourceKey = parentChildPropMap
+          ?.get(instance.type as unknown as object)
+          ?.get(propKey);
+
+        if (sourceKey && parentRawSetupState) {
+          const sourceRaw = (parentRawSetupState as any)[sourceKey];
+          if (sourceRaw) parentNode = valNodeMap.get(sourceRaw);
         }
       }
 
@@ -133,23 +172,46 @@ export function collectInstance(
     });
   }
 
-  // Dry-run render：傳入正確的 $setup 參數觸發 recording proxy
-  // Vue template 存取 $setup.xxx（不是 _ctx.xxx），需要明確傳入
+  // Sentinel dry-run：對每個 setupState key 回傳唯一 symbol
+  // 捕捉 dry-run VNode，從子元件 props 中的 sentinel 直接建立 propName → parentKey 對應
   if ((instance as any).render && Object.keys(rawSetupState).length > 0) {
     const proxyToUse = (instance as any).withProxy ?? (instance as any).proxy;
+    const sentinelToKey = new Map<symbol, string>();
+    const sentinelProxy = new Proxy(instance.setupState as object, {
+      get(target, key, receiver) {
+        if (typeof key === "string" && !key.startsWith("__v_")) {
+          const s = Symbol(key);
+          sentinelToKey.set(s, key);
+          return s;
+        }
+        return Reflect.get(target, key, receiver);
+      },
+    });
 
+    const savedSetupState = instance.setupState;
+    instance.setupState = sentinelProxy as any;
+    let dryRunVNode: any = null;
     try {
-      (instance as any).render.call(
+      dryRunVNode = (instance as any).render.call(
         proxyToUse,
-        proxyToUse,                                  // _ctx
-        (instance as any).renderCache ?? [],         // _cache
-        instance.props,                              // $props
-        instance.setupState,                         // $setup ← recording proxy
-        (instance as any).data ?? {},                // $data
-        (instance as any).ctx ?? {},                 // $options
+        proxyToUse,                                // _ctx
+        (instance as any).renderCache ?? [],       // _cache
+        instance.props,                            // $props
+        sentinelProxy,                             // $setup ← sentinel proxy
+        (instance as any).data ?? {},              // $data
+        (instance as any).ctx ?? {},               // $options
       );
     } catch {
       // ignore render errors during dry-run
+    }
+    instance.setupState = savedSetupState;
+
+    if (dryRunVNode) {
+      const childPropMap = new Map<object, Map<string, string>>();
+      traverseVNodeForSentinels(dryRunVNode, sentinelToKey, rawSetupState, childPropMap);
+      if (childPropMap.size > 0) {
+        instanceChildPropKeyMap.set(instance, childPropMap);
+      }
     }
   }
 
