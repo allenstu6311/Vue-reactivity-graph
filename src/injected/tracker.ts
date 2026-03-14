@@ -56,6 +56,8 @@ export function collectSetupState(
   for (const key in rawSetupState) {
     if (key === "props") continue;
     const val = rawSetupState[key];
+
+    if(typeof val !== 'object' || val === null) continue;
     val.__tracker_name = key;
 
     const node = buildNode(key, val, componentName, file);
