@@ -16,6 +16,10 @@ graph TB
         Content["content.js\n(inject script tag)"]
     end
 
+    subgraph ExtBg["⚙️ Background Script"]
+        Background["background.js\n(port 管理)"]
+    end
+
     subgraph DevToolsCtx["🛠 DevTools Context"]
         Panel["Panel UI\n(App.vue + GraphView)"]
     end
@@ -23,6 +27,9 @@ graph TB
     Content -->|script injection| Injected
     Injected -->|reads| VueApp
     Injected -->|writes| GlobalGraph
+    Injected -->|postMessage| Content
+    Content -->|sendMessage| Background
+    Background -->|port.postMessage| Panel
     Panel -->|eval| GlobalGraph
 ```
 
@@ -32,6 +39,7 @@ graph TB
 sequenceDiagram
     participant Page as Page (Main World)
     participant Content as Content Script (Isolated)
+    participant Background as Background Script
     participant DevTools as DevTools Panel
 
     Content->>Page: 注入 <script src="injected.js">
@@ -39,20 +47,13 @@ sequenceDiagram
     Page->>Page: walker.ts 遍歷 Vue component tree
     Page->>Page: tracker.ts 掛載 onTrack hooks
     Page->>Page: 依賴關係寫入 window.__vueReactivityGraph
-
+    Page->>Content: window.postMessage('VUE_GRAPH_UPDATE')
+    Content->>Background: chrome.runtime.sendMessage
+    Background->>DevTools: port.postMessage('VUE_GRAPH_UPDATE')
     DevTools->>Page: chrome.devtools.inspectedWindow.eval()
     Page-->>DevTools: JSON.stringify(__vueReactivityGraph)
     DevTools->>DevTools: 渲染 VariableList + GraphView (Vue Flow)
 ```
-
-## 各腳本職責
-
-| 腳本 | 執行環境 | 職責 |
-|------|----------|------|
-| `content.js` | Isolated World | 將 `injected.js` 以 `<script>` 注入頁面 |
-| `injected.js` | Page Main World | 遍歷 Vue tree、掛載 onTrack、建立 GraphNode |
-| `devtools.html` | DevTools | 註冊 DevTools panel |
-| `panel.js` | DevTools Context | 透過 `eval()` 讀取 graph、渲染 UI |
 
 ## 為什麼需要 injected 模式
 
