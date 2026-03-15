@@ -4,7 +4,7 @@ import type { GraphNode } from '../graph/types'
 
 // 被追蹤的響應式物件（ref、reactive、pinia store state）
 export interface TrackedTarget {
-  __tracker_name?: string
+  __vrg_depKey?: string
   __node?: GraphNode
   $id?: string // pinia store 識別碼
   [key: string | symbol]: unknown
@@ -26,7 +26,7 @@ export interface TrackEvent {
 export type WatchEffects = ReactiveEffect
 
 export type TrackerDebuggerEvent = DebuggerEvent & {
-  __tracker_name?: string
+  __vrg_depKey?: string
   $id: string
 }
 
@@ -38,7 +38,7 @@ export interface ComputedRefImpl {
   globalVersion: number
   _trackId?: number
   value: unknown
-  __tracker_name?: string
+  __vrg_depKey?: string
   _rawValue?: TrackedTarget | null
 }
 

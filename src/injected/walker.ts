@@ -154,6 +154,8 @@ export function collectInstance(
   }
 
   // 建 watch nodes（不觸發 effect）
+  //instance.scope.effects 包含 render effect 與所有 watch effect
+  // instance.effect 是 component 的 render effect，需要排除，只保留 watch
   const watchEffects = instance.scope?.effects.filter(
     (e) => e !== instance.effect,
   );
@@ -175,10 +177,16 @@ export function collectInstance(
   // Sentinel dry-run：對每個 setupState key 回傳唯一 symbol
   // 捕捉 dry-run VNode，從子元件 props 中的 sentinel 直接建立 propName → parentKey 對應
   if ((instance as any).render && Object.keys(rawSetupState).length > 0) {
+    //withProxy 是給 runtime-compiled 模板（with block）使用的 proxy，有不同的 has trap
+    // 讓 with(ctx){...} 的屬性查找能正確運作，沒有時 fallback 到一般 proxy
     const proxyToUse = (instance as any).withProxy ?? (instance as any).proxy;
     const sentinelToKey = new Map<symbol, string>();
+    //sentinel proxy 讓每個 setupState key 回傳唯一 Symbol 代替真實值
+    // render 執行後，VNode props 中出現的 Symbol 就能直接對應回父層的 key 名
+    // 不需要比對 value（primitive 值會碰撞），每個 Symbol 天生唯一
     const sentinelProxy = new Proxy(instance.setupState as object, {
       get(target, key, receiver) {
+        //跳過 __v_ 開頭的 Vue 內部屬性，攔截會破壞響應式系統
         if (typeof key === "string" && !key.startsWith("__v_")) {
           const s = Symbol(key);
           sentinelToKey.set(s, key);
@@ -188,10 +196,14 @@ export function collectInstance(
       },
     });
 
+    //暫時替換 instance.setupState 讓 render 存取 sentinel proxy
+    // 結束後必須還原，否則會破壞 Vue 的響應式系統
     const savedSetupState = instance.setupState;
     instance.setupState = sentinelProxy as any;
     let dryRunVNode: any = null;
     try {
+      //編譯後的 render 函數簽名為 (ctx, cache, $props, $setup, $data, $options)
+      // $setup 必須傳入 sentinelProxy，模板的 _ctx.xxx 才會存取到 sentinel 值
       dryRunVNode = (instance as any).render.call(
         proxyToUse,
         proxyToUse,                                // _ctx
@@ -266,7 +278,7 @@ export function triggerInstance(
       effect.onTrack = (event: DebuggerEvent) => {
         const trackerEvent = event.target as TrackerDebuggerEvent;
         const depName =
-          trackerEvent.__tracker_name ??
+          trackerEvent.__vrg_depKey ??
           (trackerEvent.$id ? String(event.key) : undefined);
         if (!depName) return;
 
