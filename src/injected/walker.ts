@@ -91,13 +91,18 @@ export function collectInstance(
   const rawSetupState = instance.setupState?.["__v_raw"] || {};
 
   const parentRawSetupState = instance.parent?.setupState?.["__v_raw"];
+  // instance.propsOptions = [props定義物件, Vue內部轉型列表]，取 [0] 遍歷所有 prop 名稱
   const propsOptions = instance.propsOptions?.[0];
 
   // Props 追蹤：建 prop nodes + 存進 propKeyNodeMap
   if (propsOptions) {
+    // instance.props 是響應式 proxy，需取 __v_raw 原始物件作為 WeakMap key
+    // 否則 proxy 與 raw 是不同物件，外層傳入同一個 props 時無法命中
     const rawPropsObj = ((instance.props as any).__v_raw ??
       instance.props) as object;
     const propMap = new Map<string, GraphNode>();
+    // computed/watch 的 onTrack event.target 是 raw props object，不在 valNodeMap 裡
+    // 因此另開 propKeyNodeMap，讓 onTrack 能從 props raw object 查到對應的 prop node
     propKeyNodeMap.set(rawPropsObj, propMap);
 
     for (const propKey in propsOptions) {
