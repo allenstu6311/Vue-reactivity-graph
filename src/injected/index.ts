@@ -1,7 +1,7 @@
 import { collectInstance, triggerInstance } from "./walker";
 import type { ExtendedComponentInstance } from "../types/vue-internals";
-import { getGraph, setOnUpdate } from "../types/graph";
-import type { NodeType } from "../types/graph";
+import { getGraph, setOnUpdate } from "../graph";
+import type { NodeType } from "../graph";
 
 interface VueAppInternals {
   __vue_app__?: {

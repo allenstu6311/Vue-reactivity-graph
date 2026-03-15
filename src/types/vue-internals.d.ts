@@ -1,6 +1,6 @@
 import type { ComponentInternalInstance, EffectScope, ReactiveEffect } from 'vue'
 import type { DebuggerEvent } from 'vue'
-import type { GraphNode } from './graph'
+import type { GraphNode } from '../graph/types'
 
 // 被追蹤的響應式物件（ref、reactive、pinia store state）
 export interface TrackedTarget {

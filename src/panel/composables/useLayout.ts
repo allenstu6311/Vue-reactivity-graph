@@ -1,5 +1,5 @@
 import dagre from '@dagrejs/dagre'
-import type { GraphNode } from '../../types/graph'
+import type { GraphNode } from '../../graph'
 import { type Node, type Edge, MarkerType } from '@vue-flow/core'
 const NW = 148
 const NH = 66

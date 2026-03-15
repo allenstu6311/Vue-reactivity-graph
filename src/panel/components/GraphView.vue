@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { VueFlow } from '@vue-flow/core'
 import GraphNode from './GraphNode.vue'
 import { buildLayout } from '../composables/useLayout'
-import type { GraphNode as GNode } from '../../types/graph'
+import type { GraphNode as GNode } from '../../graph'
 
 const props = defineProps<{
   nodes: GNode[]

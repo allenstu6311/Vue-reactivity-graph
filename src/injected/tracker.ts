@@ -1,4 +1,4 @@
-import { GraphNode, notifyUpdate } from "../types/graph";
+import { GraphNode, notifyUpdate } from "../graph";
 import type {
   ComputedRefImpl,
   RawSetupState,
@@ -83,13 +83,13 @@ export function collectSetupState(
 
     if (typeof val !== "object" || val === null) continue;
 
-    const existingNode = valNodeMap.get(val);
-    if (existingNode) {
-      // 這個 val 已經被父層（或 store）註冊過
-      // → 這是 inject 來的，直接建連結就好
-      // 不用建新 node，existingNode 就是來源
-      return;
-    }
+    // const existingNode = valNodeMap.get(val);
+    // if (existingNode) {
+    //   // 這個 val 已經被父層（或 store）註冊過
+    //   // → 這是 inject 來的，直接建連結就好
+    //   // 不用建新 node，existingNode 就是來源
+    //   return;
+    // }
 
     val.__tracker_name = key;
     const node = buildNode(key, val, componentName, file);

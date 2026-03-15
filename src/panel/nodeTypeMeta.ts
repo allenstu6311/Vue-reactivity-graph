@@ -1,4 +1,4 @@
-import type { NodeType } from '../types/graph'
+import type { NodeType } from '../graph'
 
 export const NODE_TYPE_META = {
   ref:       { label: 'ref',       color: '#4ade80', background: 'rgba(74,222,128,.08)',  border: 'rgba(74,222,128,.28)'  },

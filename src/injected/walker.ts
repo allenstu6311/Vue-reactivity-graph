@@ -10,7 +10,7 @@ import {
   valNodeMap,
   propKeyNodeMap,
 } from "./tracker";
-import { GraphNode, updateGraph, getGraph, notifyUpdate } from "../types/graph";
+import { GraphNode, updateGraph, getGraph, notifyUpdate } from "../graph";
 
 // parent sentinel dry-run 建立的 childType → propName → parentSetupKey 對應
 const instanceChildPropKeyMap = new WeakMap<

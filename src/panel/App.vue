@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import VariableList from './components/VariableList.vue'
 import GraphView from './components/GraphView.vue'
-import type { ComponentGraph } from '../types/graph'
+import type { ComponentGraph } from '../graph'
 import { devLog } from './utils'
 
 const graph = ref<ComponentGraph>({})
