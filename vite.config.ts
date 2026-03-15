@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
@@ -7,6 +8,9 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
 export default defineConfig({
   plugins: [vue()],
+  test: {
+    environment: 'node',
+  },
   publicDir: 'public',
   build: {
     outDir: 'dist',
