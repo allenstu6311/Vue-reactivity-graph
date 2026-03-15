@@ -2,14 +2,8 @@ import { GraphNode, notifyUpdate } from "../graph";
 import type {
   ComputedRefImpl,
   RawSetupState,
-  TrackedTarget,
   TrackEvent,
 } from "../types/vue-internals";
-
-// WeakMap：避免把 __node reference 直接掛在 Vue 物件上造成循環引用
-export const valNodeMap = new WeakMap<object, GraphNode>();
-// WeakMap：props raw object → Map<propKey, GraphNode>
-export const propKeyNodeMap = new WeakMap<object, Map<string, GraphNode>>();
 
 function buildNode(
   key: string,
@@ -73,13 +67,22 @@ function buildNode(
   };
 }
 
+interface CollectSetupStateParams {
+  rawSetupState: RawSetupState
+  componentName: string
+  file: string
+  nodes: GraphNode[]
+  valNodeMap: WeakMap<object, GraphNode>
+}
+
 // Phase 1: 建 node、存 valNodeMap
-export function collectSetupState(
-  rawSetupState: RawSetupState,
-  componentName: string,
-  file: string,
-  nodes: GraphNode[],
-): void {
+export function collectSetupState({
+  rawSetupState,
+  componentName,
+  file,
+  nodes,
+  valNodeMap,
+}: CollectSetupStateParams): void {
   console.log("rawSetupState", rawSetupState);
   for (const key in rawSetupState) {
     if (key === "props") continue;
@@ -104,11 +107,38 @@ export function collectSetupState(
   }
 }
 
-// Phase 2: 設 onTrack + 觸發 computed
-export function bindSetupTrack(
+export function resolveDepNode(
+  target: object,
+  key: string | symbol,
+  depName: string,
   rawSetupState: RawSetupState,
-  componentName: string,
-): void {
+  valNodeMap: WeakMap<object, GraphNode>,
+  propKeyNodeMap: WeakMap<object, Map<string, GraphNode>>,
+): GraphNode | undefined {
+  return (
+    // target 就是響應式物件本身（ref / reactive / computed）
+    valNodeMap.get(target) ||
+    // target 是 Pinia store state proxy，不在 valNodeMap，改用 depName 從 setupState 取出原始值再查
+    valNodeMap.get(rawSetupState[depName] as object) ||
+    // target 是 raw props object；prop 值可能是 primitive 無法當 WeakMap key，所以另開兩層結構
+    propKeyNodeMap.get(target)?.get(String(key))
+  );
+}
+
+interface BindSetupTrackParams {
+  rawSetupState: RawSetupState
+  componentName: string
+  valNodeMap: WeakMap<object, GraphNode>
+  propKeyNodeMap: WeakMap<object, Map<string, GraphNode>>
+}
+
+// Phase 2: 設 onTrack + 觸發 computed
+export function bindSetupTrack({
+  rawSetupState,
+  componentName,
+  valNodeMap,
+  propKeyNodeMap,
+}: BindSetupTrackParams): void {
   for (const key in rawSetupState) {
     const val = rawSetupState[key];
 
@@ -121,10 +151,14 @@ export function bindSetupTrack(
         const depName = event.target.__vrg_depKey ?? String(event.key);
         if (!subNode.deps.includes(depName)) subNode.deps.push(depName);
 
-        const depNode =
-          valNodeMap.get(event.target as object) ||
-          valNodeMap.get(rawSetupState[depName] as object) ||
-          propKeyNodeMap.get(event.target as object)?.get(String(event.key));
+        const depNode = resolveDepNode(
+          event.target as object,
+          event.key,
+          depName,
+          rawSetupState,
+          valNodeMap,
+          propKeyNodeMap,
+        );
         console.log("depNode", depNode);
         if (depNode) {
           const subName =

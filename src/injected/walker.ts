@@ -4,12 +4,12 @@ import type {
   WatchEffects,
   TrackerDebuggerEvent,
 } from "../types/vue-internals";
-import {
-  collectSetupState,
-  bindSetupTrack,
-  valNodeMap,
-  propKeyNodeMap,
-} from "./tracker";
+import { collectSetupState, bindSetupTrack, resolveDepNode } from "./tracker";
+
+// WeakMap：避免把 __node reference 直接掛在 Vue 物件上造成循環引用
+const valNodeMap = new WeakMap<object, GraphNode>();
+// WeakMap：props raw object → Map<propKey, GraphNode>
+const propKeyNodeMap = new WeakMap<object, Map<string, GraphNode>>();
 import { GraphNode, updateGraph, getGraph, notifyUpdate } from "../graph";
 
 // parent sentinel dry-run 建立的 childType → propName → parentSetupKey 對應
@@ -155,7 +155,7 @@ export function collectInstance(
   }
 
   if (rawSetupState) {
-    collectSetupState(rawSetupState, componentName, file, nodes);
+    collectSetupState({ rawSetupState, componentName, file, nodes, valNodeMap });
   }
 
   // 建 watch nodes（不觸發 effect）
@@ -265,7 +265,7 @@ export function triggerInstance(
   const nodes = getGraph()[componentName] ?? [];
 
   if (rawSetupState) {
-    bindSetupTrack(rawSetupState, componentName);
+    bindSetupTrack({ rawSetupState, componentName, valNodeMap, propKeyNodeMap });
   }
 
   const watchEffects = instance.scope?.effects.filter(
@@ -291,10 +291,14 @@ export function triggerInstance(
           watchNode.deps.push(depName);
         }
 
-        const depNode =
-          valNodeMap.get(event.target as object) ||
-          valNodeMap.get(rawSetupState[depName] as object) ||
-          propKeyNodeMap.get(event.target as object)?.get(String(event.key));
+        const depNode = resolveDepNode(
+          event.target as object,
+          event.key,
+          depName,
+          rawSetupState,
+          valNodeMap,
+          propKeyNodeMap,
+        );
 
         if (depNode && !depNode.subs.includes(watchShortName)) {
           depNode.subs.push(watchShortName);
