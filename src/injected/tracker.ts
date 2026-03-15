@@ -20,7 +20,15 @@ function buildNode(
   const id = `${componentName}.${key}`;
 
   if (val?.fn) {
-    return { id, varName: key, type: "computed", val, file, deps: [], subs: [] };
+    return {
+      id,
+      varName: key,
+      type: "computed",
+      val,
+      file,
+      deps: [],
+      subs: [],
+    };
   }
 
   if (val?._key) {
@@ -32,7 +40,15 @@ function buildNode(
   }
 
   if (val?.setup) {
-    return { id, varName: key, type: "component", val, file, deps: [], subs: [] };
+    return {
+      id,
+      varName: key,
+      type: "component",
+      val,
+      file,
+      deps: [],
+      subs: [],
+    };
   }
 
   // reactive proxy — snapshot，過濾 Vue internal 和 __tracker_name
@@ -42,7 +58,15 @@ function buildNode(
     ),
   );
 
-  return { id, varName: key, type: "reactive", val: snapshot, file, deps: [], subs: [] };
+  return {
+    id,
+    varName: key,
+    type: "reactive",
+    val: snapshot,
+    file,
+    deps: [],
+    subs: [],
+  };
 }
 
 // Phase 1: 建 node、存 valNodeMap
@@ -57,9 +81,17 @@ export function collectSetupState(
     if (key === "props") continue;
     const val = rawSetupState[key];
 
-    if(typeof val !== 'object' || val === null) continue;
-    val.__tracker_name = key;
+    if (typeof val !== "object" || val === null) continue;
 
+    const existingNode = valNodeMap.get(val);
+    if (existingNode) {
+      // 這個 val 已經被父層（或 store）註冊過
+      // → 這是 inject 來的，直接建連結就好
+      // 不用建新 node，existingNode 就是來源
+      return;
+    }
+
+    val.__tracker_name = key;
     const node = buildNode(key, val, componentName, file);
     valNodeMap.set(val, node);
     nodes.push(node);
@@ -77,7 +109,7 @@ export function bindSetupTrack(
     if (val?.fn) {
       val.onTrack = (event: TrackEvent) => {
         const subNode = valNodeMap.get(val as object)!;
-        console.log('event', event);
+        console.log("event", event);
         console.log("subNode", subNode);
         const depName = event.target.__tracker_name ?? String(event.key);
         if (!subNode.deps.includes(depName)) subNode.deps.push(depName);
@@ -86,7 +118,7 @@ export function bindSetupTrack(
           valNodeMap.get(event.target as object) ||
           valNodeMap.get(rawSetupState[depName] as object) ||
           propKeyNodeMap.get(event.target as object)?.get(String(event.key));
-        console.log('depNode', depNode);
+        console.log("depNode", depNode);
         if (depNode) {
           const subName =
             depNode.type === "prop" ? `${componentName}.${key}` : key;
