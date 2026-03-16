@@ -73,6 +73,7 @@ interface CollectSetupStateParams {
   file: string
   nodes: GraphNode[]
   valNodeMap: WeakMap<object, GraphNode>
+  skipKeys?: Set<string>
 }
 
 // Phase 1: 建 node、存 valNodeMap
@@ -82,10 +83,12 @@ export function collectSetupState({
   file,
   nodes,
   valNodeMap,
+  skipKeys,
 }: CollectSetupStateParams): void {
   console.log("rawSetupState", rawSetupState);
   for (const key in rawSetupState) {
     if (key === "props") continue;
+    if (skipKeys?.has(key)) continue;
     const val = rawSetupState[key];
 
     if (typeof val !== "object" || val === null) continue;
@@ -161,8 +164,11 @@ export function bindSetupTrack({
         );
         console.log("depNode", depNode);
         if (depNode) {
+          // prop / inject 的 subscriber 跨 component 查找時需要完整 ID
           const subName =
-            depNode.type === "prop" ? `${componentName}.${key}` : key;
+            depNode.type === "prop" || depNode.type === "inject"
+              ? `${componentName}.${key}`
+              : key;
           if (!depNode.subs.includes(subName)) depNode.subs.push(subName);
         }
 

@@ -32,6 +32,11 @@ if (app) {
         return { ...(val as object) };
       case "watch":
         return "";
+      case "inject":
+        // inject 可能是 ref（有 _value）或 reactive（無 _value，展開物件）
+        return (val as any)?._value !== undefined
+          ? (val as any)._value
+          : { ...(val as object) };
     }
   }
 

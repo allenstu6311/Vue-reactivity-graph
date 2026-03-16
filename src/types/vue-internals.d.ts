@@ -54,6 +54,7 @@ export interface ExtendedEffectScope extends EffectScope {
 export interface ExtendedComponentInstance extends ComponentInternalInstance {
   setupState: Record<string, unknown> & { __v_raw?: RawSetupState }
   scope?: ExtendedEffectScope
+  provides?: Record<string | symbol, unknown>
   // effect?: ReactiveEffect
   // subTree: VNode
   // type: {

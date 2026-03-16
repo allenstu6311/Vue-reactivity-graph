@@ -154,8 +154,49 @@ export function collectInstance(
     }
   }
 
+  // Inject 偵測：比對 rawSetupState 值與 parent.provides，找出 inject alias
+  // 必須在 collectSetupState 之前，避免 inject 來的 ref/reactive 被誤建成一般 node
+  const injectKeySet = new Set<string>();
+  const parentProvides = instance.parent?.provides;
+  if (parentProvides) {
+    // 先建 raw → parentNode 的 lookup，避免雙層 for...in
+    const provideRawToNode = new Map<object, GraphNode>();
+    for (const key in parentProvides) {
+      const val = (parentProvides as Record<string, unknown>)[key];
+      if (typeof val !== "object" || val === null) continue;
+      const parentNode = valNodeMap.get(val as object);
+      if (parentNode) provideRawToNode.set(val as object, parentNode);
+    }
+
+    if (provideRawToNode.size > 0) {
+      for (const childKey in rawSetupState) {
+        const val = rawSetupState[childKey];
+        if (typeof val !== "object" || val === null) continue;
+        const parentNode = provideRawToNode.get(val as object);
+
+        if (!parentNode) continue;
+
+        injectKeySet.add(childKey);
+        const injectNode: GraphNode = {
+          id: `${componentName}.${childKey}`,
+          varName: childKey,
+          type: "inject",
+          val: (val as any).__v_raw ?? val,
+          file,
+          deps: [parentNode.id],
+          subs: [],
+        };
+        if (!parentNode.subs.includes(injectNode.id)) {
+          parentNode.subs.push(injectNode.id);
+        }
+        nodes.push(injectNode);
+        // 不覆寫 valNodeMap，避免兄弟元件處理時互蓋
+      }
+    }
+  }
+
   if (rawSetupState) {
-    collectSetupState({ rawSetupState, componentName, file, nodes, valNodeMap });
+    collectSetupState({ rawSetupState, componentName, file, nodes, valNodeMap, skipKeys: injectKeySet });
   }
 
   // 建 watch nodes（不觸發 effect）
@@ -263,6 +304,18 @@ export function triggerInstance(
 
   const rawSetupState = instance.setupState?.["__v_raw"] || {};
   const nodes = getGraph()[componentName] ?? [];
+
+  // inject nodes 覆寫 valNodeMap + __vrg_depKey，讓子層 computed/watch 的 onTrack
+  // 解析到 inject node，且 depName 使用 child local varName 而非父層的 key
+  // 必須在 bindSetupTrack 之前，且每個 component 的 Phase 2 是循序執行，兄弟元件不互蓋
+  for (const node of nodes) {
+    if (node.type !== "inject") continue;
+    const raw = (node.val as any)?.__v_raw ?? node.val;
+    if (raw && typeof raw === "object") {
+      valNodeMap.set(raw as object, node);
+      (raw as any).__vrg_depKey = node.varName;
+    }
+  }
 
   if (rawSetupState) {
     bindSetupTrack({ rawSetupState, componentName, valNodeMap, propKeyNodeMap });
