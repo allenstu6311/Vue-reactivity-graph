@@ -373,3 +373,119 @@ describe("resolveDepNode", () => {
     expect(result).toBeUndefined();
   });
 });
+
+// ── collectSetupState + skipKeys（inject 整合）────────────────────────────────
+
+describe("collectSetupState skipKeys", () => {
+  it("skips inject keys and does not build node or touch valNodeMap", () => {
+    const injectRef = makeRef();
+    const nodes: GraphNode[] = [];
+    const valNodeMap = new WeakMap<object, GraphNode>();
+    const skipKeys = new Set(["localCount"]);
+
+    collectSetupState({
+      rawSetupState: { localCount: injectRef } as any,
+      componentName: "Child",
+      file: "Child.vue",
+      nodes,
+      valNodeMap,
+      skipKeys,
+    });
+
+    expect(nodes).toHaveLength(0);
+    expect(valNodeMap.get(injectRef)).toBeUndefined();
+  });
+
+  it("still builds nodes for non-inject keys", () => {
+    const injectRef = makeRef();
+    const localRef = makeRef();
+    const nodes: GraphNode[] = [];
+    const valNodeMap = new WeakMap<object, GraphNode>();
+    const skipKeys = new Set(["localCount"]);
+
+    collectSetupState({
+      rawSetupState: { localCount: injectRef, own: localRef } as any,
+      componentName: "Child",
+      file: "Child.vue",
+      nodes,
+      valNodeMap,
+      skipKeys,
+    });
+
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].varName).toBe("own");
+  });
+});
+
+// ── inject node 建立（walker 邏輯的單元模擬）─────────────────────────────────
+
+describe("inject node creation logic", () => {
+  it("inject node 有正確的 id / varName / type / deps", () => {
+    const parentRef = makeRef();
+    const parentNode = makeNode({ id: "Parent.count", varName: "count", type: "ref", val: parentRef });
+    const valNodeMap = new WeakMap([[parentRef as object, parentNode]]);
+
+    // 模擬 walker 偵測到 inject
+    const injectNode: GraphNode = {
+      id: "Child.localCount",
+      varName: "localCount",
+      type: "inject",
+      val: parentRef,
+      file: "Child.vue",
+      deps: [parentNode.id],
+      subs: [],
+    };
+    parentNode.subs.push(injectNode.id);
+
+    expect(injectNode.type).toBe("inject");
+    expect(injectNode.deps).toContain("Parent.count");
+    expect(parentNode.subs).toContain("Child.localCount");
+  });
+
+  it("Phase 2 覆寫 valNodeMap 後，resolveDepNode 解析到 inject node", () => {
+    const parentRef = makeRef();
+    const parentNode = makeNode({ id: "Parent.count", varName: "count", type: "ref", val: parentRef });
+    const injectNode = makeNode({ id: "Child.localCount", varName: "localCount", type: "inject", val: parentRef });
+
+    const valNodeMap = new WeakMap<object, GraphNode>([[parentRef as object, parentNode]]);
+    const propKeyNodeMap = new WeakMap<object, Map<string, GraphNode>>();
+
+    // Phase 2：覆寫
+    valNodeMap.set(parentRef as object, injectNode);
+
+    const result = resolveDepNode(parentRef as object, "value", "localCount", {} as any, valNodeMap, propKeyNodeMap);
+    expect(result).toBe(injectNode);
+  });
+
+  it("多子元件 inject 同一來源：各自的 inject node 互不覆蓋（Phase 2 循序執行）", () => {
+    const parentRef = makeRef();
+    const parentNode = makeNode({ id: "Parent.count", varName: "count", type: "ref", val: parentRef });
+
+    const injectNodeA = makeNode({ id: "ChildA.local", varName: "local", type: "inject", val: parentRef });
+    const injectNodeB = makeNode({ id: "ChildB.local", varName: "local", type: "inject", val: parentRef });
+
+    const valNodeMap = new WeakMap<object, GraphNode>([[parentRef as object, parentNode]]);
+    const propKeyNodeMap = new WeakMap<object, Map<string, GraphNode>>();
+
+    // ChildA Phase 2
+    valNodeMap.set(parentRef as object, injectNodeA);
+    const resultA = resolveDepNode(parentRef as object, "value", "local", {} as any, valNodeMap, propKeyNodeMap);
+    expect(resultA).toBe(injectNodeA);
+
+    // ChildB Phase 2（循序，ChildA 的 bindSetupTrack 已跑完）
+    valNodeMap.set(parentRef as object, injectNodeB);
+    const resultB = resolveDepNode(parentRef as object, "value", "local", {} as any, valNodeMap, propKeyNodeMap);
+    expect(resultB).toBe(injectNodeB);
+  });
+
+  it("非 user-defined provide（不在 valNodeMap）不建 inject node", () => {
+    const frameworkVal = { __v_isReactive: true }; // 不在 valNodeMap
+    const emptyValNodeMap = new WeakMap<object, GraphNode>();
+
+    // 模擬 provideRawToNode 建立過程
+    const raw = (frameworkVal as any).__v_raw ?? frameworkVal;
+    const parentNode = emptyValNodeMap.get(raw as object);
+
+    expect(parentNode).toBeUndefined(); // 應該跳過，不建 inject node
+  });
+});
