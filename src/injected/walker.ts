@@ -10,6 +10,8 @@ import { collectSetupState, bindSetupTrack, resolveDepNode } from "./tracker";
 const valNodeMap = new WeakMap<object, GraphNode>();
 // WeakMap：props raw object → Map<propKey, GraphNode>
 const propKeyNodeMap = new WeakMap<object, Map<string, GraphNode>>();
+// WeakMap：inject raw value → injectNode（Phase 1 用，深度優先保證父層先寫，子層 prop 連結才查）
+const injectRawToNodeMap = new WeakMap<object, GraphNode>();
 import { GraphNode, updateGraph, getGraph, notifyUpdate } from "../graph";
 
 // parent sentinel dry-run 建立的 childType → propName → parentSetupKey 對應
@@ -125,7 +127,7 @@ export function collectInstance(
       if (parentRawSetupState) {
         const sameNameVal = (parentRawSetupState as any)[propKey];
         if (sameNameVal && typeof sameNameVal === "object") {
-          parentNode = valNodeMap.get(sameNameVal);
+          parentNode = injectRawToNodeMap.get(sameNameVal) ?? valNodeMap.get(sameNameVal);
         }
       }
 
@@ -141,7 +143,7 @@ export function collectInstance(
 
         if (sourceKey && parentRawSetupState) {
           const sourceRaw = (parentRawSetupState as any)[sourceKey];
-          if (sourceRaw) parentNode = valNodeMap.get(sourceRaw);
+          if (sourceRaw) parentNode = injectRawToNodeMap.get(sourceRaw) ?? valNodeMap.get(sourceRaw);
         }
       }
 
@@ -191,6 +193,9 @@ export function collectInstance(
         }
         nodes.push(injectNode);
         // 不覆寫 valNodeMap，避免兄弟元件處理時互蓋
+        // 寫入 injectRawToNodeMap，讓子層 prop 連結能查到此 inject node（深度優先保證父層先寫）
+        const injectRaw = (val as any).__v_raw ?? val;
+        injectRawToNodeMap.set(injectRaw as object, injectNode);
       }
     }
   }
@@ -305,20 +310,19 @@ export function triggerInstance(
   const rawSetupState = instance.setupState?.["__v_raw"] || {};
   const nodes = getGraph()[componentName] ?? [];
 
-  // inject nodes 覆寫 valNodeMap + __vrg_depKey，讓子層 computed/watch 的 onTrack
-  // 解析到 inject node，且 depName 使用 child local varName 而非父層的 key
-  // 必須在 bindSetupTrack 之前，且每個 component 的 Phase 2 是循序執行，兄弟元件不互蓋
+  // 建 per-component inject lookup：raw → injectNode
+  // 區域 Map，不污染全域 valNodeMap，兄弟 component 不互蓋
+  const injectRawToLocalNode = new Map<object, GraphNode>();
   for (const node of nodes) {
     if (node.type !== "inject") continue;
     const raw = (node.val as any)?.__v_raw ?? node.val;
     if (raw && typeof raw === "object") {
-      valNodeMap.set(raw as object, node);
-      (raw as any).__vrg_depKey = node.varName;
+      injectRawToLocalNode.set(raw as object, node);
     }
   }
 
   if (rawSetupState) {
-    bindSetupTrack({ rawSetupState, componentName, valNodeMap, propKeyNodeMap });
+    bindSetupTrack({ rawSetupState, componentName, valNodeMap, propKeyNodeMap, injectRawToLocalNode });
   }
 
   const watchEffects = instance.scope?.effects.filter(
@@ -351,6 +355,7 @@ export function triggerInstance(
           rawSetupState,
           valNodeMap,
           propKeyNodeMap,
+          injectRawToLocalNode,
         );
 
         if (depNode && !depNode.subs.includes(watchShortName)) {

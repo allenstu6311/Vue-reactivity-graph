@@ -117,8 +117,11 @@ export function resolveDepNode(
   rawSetupState: RawSetupState,
   valNodeMap: WeakMap<object, GraphNode>,
   propKeyNodeMap: WeakMap<object, Map<string, GraphNode>>,
+  injectRawToLocalNode: Map<object, GraphNode>,
 ): GraphNode | undefined {
   return (
+    // target 是當前 component 的 inject 值；per-component 區域 Map，不污染全域 valNodeMap
+    injectRawToLocalNode.get(target) ||
     // target 就是響應式物件本身（ref / reactive / computed）
     valNodeMap.get(target) ||
     // target 是 Pinia store state proxy，不在 valNodeMap，改用 depName 從 setupState 取出原始值再查
@@ -133,6 +136,7 @@ interface BindSetupTrackParams {
   componentName: string
   valNodeMap: WeakMap<object, GraphNode>
   propKeyNodeMap: WeakMap<object, Map<string, GraphNode>>
+  injectRawToLocalNode: Map<object, GraphNode>
 }
 
 // Phase 2: 設 onTrack + 觸發 computed
@@ -141,6 +145,7 @@ export function bindSetupTrack({
   componentName,
   valNodeMap,
   propKeyNodeMap,
+  injectRawToLocalNode,
 }: BindSetupTrackParams): void {
   for (const key in rawSetupState) {
     const val = rawSetupState[key];
@@ -161,6 +166,7 @@ export function bindSetupTrack({
           rawSetupState,
           valNodeMap,
           propKeyNodeMap,
+          injectRawToLocalNode,
         );
         console.log("depNode", depNode);
         if (depNode) {
