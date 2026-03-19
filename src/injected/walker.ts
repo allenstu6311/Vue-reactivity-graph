@@ -67,7 +67,12 @@ function traverseVNodeForSentinels(
           const slotVNodes = (slotFn as () => unknown)();
           if (Array.isArray(slotVNodes)) {
             for (const sv of slotVNodes) {
-              traverseVNodeForSentinels(sv, sentinelToKey, rawSetupState, result);
+              traverseVNodeForSentinels(
+                sv,
+                sentinelToKey,
+                rawSetupState,
+                result,
+              );
             }
           }
         } catch {
@@ -106,7 +111,6 @@ export function collectInstance(
     // computed/watch 的 onTrack event.target 是 raw props object，不在 valNodeMap 裡
     // 因此另開 propKeyNodeMap，讓 onTrack 能從 props raw object 查到對應的 prop node
     propKeyNodeMap.set(rawPropsObj, propMap);
-
     for (const propKey in propsOptions) {
       const propNode: GraphNode = {
         id: `${componentName}.${propKey}`,
@@ -127,7 +131,8 @@ export function collectInstance(
       if (parentRawSetupState) {
         const sameNameVal = (parentRawSetupState as any)[propKey];
         if (sameNameVal && typeof sameNameVal === "object") {
-          parentNode = injectRawToNodeMap.get(sameNameVal) ?? valNodeMap.get(sameNameVal);
+          parentNode =
+            injectRawToNodeMap.get(sameNameVal) ?? valNodeMap.get(sameNameVal);
         }
       }
 
@@ -141,9 +146,21 @@ export function collectInstance(
           ?.get(instance.type as unknown as object)
           ?.get(propKey);
 
-        if (sourceKey && parentRawSetupState) {
-          const sourceRaw = (parentRawSetupState as any)[sourceKey];
-          if (sourceRaw) parentNode = injectRawToNodeMap.get(sourceRaw) ?? valNodeMap.get(sourceRaw);
+        if (sourceKey) {
+          if (sourceKey.startsWith("prop") && instance.parent?.props) {
+            // 來源是父層的 prop，走 propKeyNodeMap 查找
+            const parentPropKey = sourceKey.slice(6);
+            const parentRawPropsObj = ((instance.parent.props as any).__v_raw ??
+              instance.parent.props) as object;
+            parentNode = propKeyNodeMap
+              .get(parentRawPropsObj)
+              ?.get(parentPropKey);
+          } else if (parentRawSetupState) {
+            const sourceRaw = (parentRawSetupState as any)[sourceKey];
+            if (sourceRaw)
+              parentNode =
+                injectRawToNodeMap.get(sourceRaw) ?? valNodeMap.get(sourceRaw);
+          }
         }
       }
 
@@ -177,7 +194,6 @@ export function collectInstance(
         const parentNode = provideRawToNode.get(val as object);
 
         if (!parentNode) continue;
-
         injectKeySet.add(childKey);
         const injectNode: GraphNode = {
           id: `${componentName}.${childKey}`,
@@ -201,7 +217,14 @@ export function collectInstance(
   }
 
   if (rawSetupState) {
-    collectSetupState({ rawSetupState, componentName, file, nodes, valNodeMap, skipKeys: injectKeySet });
+    collectSetupState({
+      rawSetupState,
+      componentName,
+      file,
+      nodes,
+      valNodeMap,
+      skipKeys: injectKeySet,
+    });
   }
 
   // 建 watch nodes（不觸發 effect）
@@ -237,8 +260,24 @@ export function collectInstance(
     // 不需要比對 value（primitive 值會碰撞），每個 Symbol 天生唯一
     const sentinelProxy = new Proxy(instance.setupState as object, {
       get(target, key, receiver) {
-        //跳過 __v_ 開頭的 Vue 內部屬性，攔截會破壞響應式系統
         if (typeof key === "string" && !key.startsWith("__v_")) {
+          // props 是物件，需要遞迴攔截 .xxx 的存取
+          if (key === "props" && instance.props) {
+            return new Proxy(instance.props as object, {
+              get(_, propKey) {
+                if (
+                  typeof propKey === "string" &&
+                  !propKey.startsWith("__v_")
+                ) {
+                  const s = Symbol(`props.${propKey}`);
+                  sentinelToKey.set(s, `props.${propKey}`);
+                  return s;
+                }
+                return Reflect.get(instance.props as object, propKey);
+              },
+            });
+          }
+
           const s = Symbol(key);
           sentinelToKey.set(s, key);
           return s;
@@ -257,12 +296,12 @@ export function collectInstance(
       // $setup 必須傳入 sentinelProxy，模板的 _ctx.xxx 才會存取到 sentinel 值
       dryRunVNode = (instance as any).render.call(
         proxyToUse,
-        proxyToUse,                                // _ctx
-        (instance as any).renderCache ?? [],       // _cache
-        instance.props,                            // $props
-        sentinelProxy,                             // $setup ← sentinel proxy
-        (instance as any).data ?? {},              // $data
-        (instance as any).ctx ?? {},               // $options
+        proxyToUse, // _ctx
+        (instance as any).renderCache ?? [], // _cache
+        instance.props, // $props ← props sentinel
+        sentinelProxy, // $setup ← sentinel proxy
+        (instance as any).data ?? {}, // $data
+        (instance as any).ctx ?? {}, // $options
       );
     } catch {
       // ignore render errors during dry-run
@@ -271,7 +310,13 @@ export function collectInstance(
 
     if (dryRunVNode) {
       const childPropMap = new Map<object, Map<string, string>>();
-      traverseVNodeForSentinels(dryRunVNode, sentinelToKey, rawSetupState, childPropMap);
+      traverseVNodeForSentinels(
+        dryRunVNode,
+        sentinelToKey,
+        rawSetupState,
+        childPropMap,
+      );
+
       if (childPropMap.size > 0) {
         instanceChildPropKeyMap.set(instance, childPropMap);
       }
@@ -322,7 +367,13 @@ export function triggerInstance(
   }
 
   if (rawSetupState) {
-    bindSetupTrack({ rawSetupState, componentName, valNodeMap, propKeyNodeMap, injectRawToLocalNode });
+    bindSetupTrack({
+      rawSetupState,
+      componentName,
+      valNodeMap,
+      propKeyNodeMap,
+      injectRawToLocalNode,
+    });
   }
 
   const watchEffects = instance.scope?.effects.filter(
