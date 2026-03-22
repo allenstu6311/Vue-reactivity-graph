@@ -20,12 +20,22 @@ const instanceChildPropKeyMap = new WeakMap<
   Map<object, Map<string, string>>
 >();
 
+// 對齊 Vue 的 resolveAsset 邏輯：exact → camelCase → PascalCase
+function resolveGlobalComponent(appContext: any, name: string): object | undefined {
+  const components = appContext?.components;
+  if (!components) return undefined;
+  const camel = name.replace(/-(\w)/g, (_, c: string) => c.toUpperCase());
+  const pascal = camel.charAt(0).toUpperCase() + camel.slice(1);
+  return components[name] ?? components[camel] ?? components[pascal];
+}
+
 // 遍歷 dry-run VNode tree，找出子元件 props 中的 sentinel symbol
 function traverseVNodeForSentinels(
   vnode: any,
   sentinelToKey: Map<symbol, string>,
   rawSetupState: object,
   result: Map<object, Map<string, string>>,
+  appContext: any,
 ): void {
   if (!vnode || typeof vnode !== "object") return;
 
@@ -37,7 +47,11 @@ function traverseVNodeForSentinels(
       const keyName = sentinelToKey.get(vnode.type)!;
       resolvedType = (rawSetupState as any)[keyName];
     }
-
+    // 全域元件（如 el-table）的 type 是字串，需從 appContext 解析成 component object
+    // 才能與子元件的 instance.type 對應
+    if (typeof resolvedType === "string") {
+      resolvedType = resolveGlobalComponent(appContext, resolvedType) ?? resolvedType;
+    }
     if (resolvedType && typeof resolvedType === "object") {
       const propMap = new Map<string, string>();
       for (const [propName, val] of Object.entries(
@@ -57,7 +71,7 @@ function traverseVNodeForSentinels(
   const children = vnode.children;
   if (Array.isArray(children)) {
     for (const child of children) {
-      traverseVNodeForSentinels(child, sentinelToKey, rawSetupState, result);
+      traverseVNodeForSentinels(child, sentinelToKey, rawSetupState, result, appContext);
     }
   } else if (children && typeof children === "object") {
     // Slots
@@ -72,6 +86,7 @@ function traverseVNodeForSentinels(
                 sentinelToKey,
                 rawSetupState,
                 result,
+                appContext,
               );
             }
           }
@@ -88,13 +103,12 @@ export function collectInstance(
   instance: ExtendedComponentInstance,
   prevComponentName?: string,
 ): void {
-  console.log('instance', instance)
+  // console.log('instance', instance.appContext)
 
-    const file =
-    ((instance.type as Record<string, unknown>).__name as string) 
-    ||   ((instance.type as Record<string, unknown>).name as string) 
-    || "Anonymous";
-
+  const file =
+    ((instance.type as Record<string, unknown>).__name as string) ||
+    ((instance.type as Record<string, unknown>).name as string) ||
+    "Anonymous";
 
   const componentName = prevComponentName
     ? `${prevComponentName}.${file}`
@@ -118,6 +132,7 @@ export function collectInstance(
     // computed/watch 的 onTrack event.target 是 raw props object，不在 valNodeMap 裡
     // 因此另開 propKeyNodeMap，讓 onTrack 能從 props raw object 查到對應的 prop node
     propKeyNodeMap.set(rawPropsObj, propMap);
+
     for (const propKey in propsOptions) {
       const propNode: GraphNode = {
         id: `${componentName}.${propKey}`,
@@ -128,6 +143,7 @@ export function collectInstance(
         deps: [],
         subs: [],
       };
+
       nodes.push(propNode);
       propMap.set(propKey, propNode);
 
@@ -322,7 +338,11 @@ export function collectInstance(
         sentinelToKey,
         rawSetupState,
         childPropMap,
+        instance.appContext,
       );
+
+        console.log("dryRunVNode", dryRunVNode);
+        console.log('childPropMap', childPropMap)
 
       if (childPropMap.size > 0) {
         instanceChildPropKeyMap.set(instance, childPropMap);
