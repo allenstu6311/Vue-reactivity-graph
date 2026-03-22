@@ -88,11 +88,18 @@ export function collectInstance(
   instance: ExtendedComponentInstance,
   prevComponentName?: string,
 ): void {
+  console.log('instance', instance)
+
+    const file =
+    ((instance.type as Record<string, unknown>).__name as string) 
+    ||   ((instance.type as Record<string, unknown>).name as string) 
+    || "Anonymous";
+
+
   const componentName = prevComponentName
-    ? `${prevComponentName}.${instance?.type?.__name || "Unknown"}`
-    : instance?.type?.__name || "Unknown";
-  const file =
-    ((instance.type as Record<string, unknown>).__name as string) ?? "";
+    ? `${prevComponentName}.${file}`
+    : file;
+
   const nodes: GraphNode[] = [];
 
   const rawSetupState = instance.setupState?.["__v_raw"] || {};
