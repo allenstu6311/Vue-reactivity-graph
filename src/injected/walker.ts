@@ -21,7 +21,10 @@ const instanceChildPropKeyMap = new WeakMap<
 >();
 
 // 對齊 Vue 的 resolveAsset 邏輯：exact → camelCase → PascalCase
-function resolveGlobalComponent(appContext: any, name: string): object | undefined {
+function resolveGlobalComponent(
+  appContext: any,
+  name: string,
+): object | undefined {
   const components = appContext?.components;
   if (!components) return undefined;
   const camel = name.replace(/-(\w)/g, (_, c: string) => c.toUpperCase());
@@ -50,7 +53,8 @@ function traverseVNodeForSentinels(
     // 全域元件（如 el-table）的 type 是字串，需從 appContext 解析成 component object
     // 才能與子元件的 instance.type 對應
     if (typeof resolvedType === "string") {
-      resolvedType = resolveGlobalComponent(appContext, resolvedType) ?? resolvedType;
+      resolvedType =
+        resolveGlobalComponent(appContext, resolvedType) ?? resolvedType;
     }
     if (resolvedType && typeof resolvedType === "object") {
       const propMap = new Map<string, string>();
@@ -71,7 +75,13 @@ function traverseVNodeForSentinels(
   const children = vnode.children;
   if (Array.isArray(children)) {
     for (const child of children) {
-      traverseVNodeForSentinels(child, sentinelToKey, rawSetupState, result, appContext);
+      traverseVNodeForSentinels(
+        child,
+        sentinelToKey,
+        rawSetupState,
+        result,
+        appContext,
+      );
     }
   } else if (children && typeof children === "object") {
     // Slots
@@ -375,9 +385,14 @@ export function triggerInstance(
   instance: ExtendedComponentInstance,
   prevComponentName?: string,
 ): void {
+  const file =
+    ((instance.type as Record<string, unknown>).__name as string) ||
+    ((instance.type as Record<string, unknown>).name as string) ||
+    "Anonymous";
+
   const componentName = prevComponentName
-    ? `${prevComponentName}.${instance?.type?.__name || "Unknown"}`
-    : instance?.type?.__name || "Unknown";
+    ? `${prevComponentName}.${file}`
+    : file;
 
   const rawSetupState = instance.setupState?.["__v_raw"] || {};
   const nodes = getGraph()[componentName] ?? [];
@@ -417,9 +432,15 @@ export function triggerInstance(
 
       effect.onTrack = (event: DebuggerEvent) => {
         const trackerEvent = event.target as TrackerDebuggerEvent;
+        // const depName =
+        //   trackerEvent.__vrg_depKey ??
+        //   (trackerEvent.$id ? String(event.key) : undefined);
         const depName =
           trackerEvent.__vrg_depKey ??
-          (trackerEvent.$id ? String(event.key) : undefined);
+          (trackerEvent.$id ? String(event.key) : undefined) ??
+          (propKeyNodeMap.has(event.target as object)
+            ? String(event.key)
+            : undefined);
         if (!depName) return;
 
         if (!watchNode.deps.includes(depName)) {
@@ -442,7 +463,6 @@ export function triggerInstance(
 
         notifyUpdate();
       };
-
       effect.run();
     });
   }
