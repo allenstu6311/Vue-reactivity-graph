@@ -73,10 +73,8 @@ const grouped = computed(() => {
 
 <style scoped>
 .left {
-  width: 252px;
-  flex-shrink: 0;
-  border-right: 1px solid #1f2e45;
-  background: #111622;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }

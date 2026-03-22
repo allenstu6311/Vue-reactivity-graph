@@ -148,6 +148,8 @@ body {
   background: #111622;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .comp-select-wrap {
