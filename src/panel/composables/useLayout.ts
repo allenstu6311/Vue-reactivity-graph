@@ -12,15 +12,19 @@ export function buildLayout(
   if (!focused) return { nodes: [], edges: [] }
 
   const compPrefix = selectedId.split('.').slice(0, -1).join('.')
-  function findNode(nameOrId: string): GraphNode | undefined {
+  // deps/subs 存的可能是短名（"price"）或完整 id（"App.ElTable.data"），先直查，找不到再用所在元件的 prefix 補全
+  function findNode(nameOrId: string, contextNodeId?: string): GraphNode | undefined {
+    const prefix = contextNodeId
+      ? contextNodeId.split('.').slice(0, -1).join('.')
+      : compPrefix
     return allNodes.find(n => n.id === nameOrId)
-      ?? allNodes.find(n => n.id === `${compPrefix}.${nameOrId}`)
+      ?? allNodes.find(n => n.id === `${prefix}.${nameOrId}`)
   }
 
-  const depNodes = (focused.deps ?? []).map(findNode).filter(Boolean) as GraphNode[]
-  const subNodes = (focused.subs ?? []).map(findNode).filter(Boolean) as GraphNode[]
+  const depNodes = (focused.deps ?? []).map(d => findNode(d)).filter(Boolean) as GraphNode[]
+  const subNodes = (focused.subs ?? []).map(s => findNode(s)).filter(Boolean) as GraphNode[]
 
-  // Deduplicate: focused might also appear in deps/subs
+  // seen 防止 BFS 重複走同一節點，例如 a.deps=[b], b.deps=[a] 互相依賴時不會無限迴圈
   const seen = new Set<string>([focused.id])
   const uniqueDeps = depNodes.filter(n => !seen.has(n.id) && seen.add(n.id))
   const uniqueSubs = subNodes.filter(n => !seen.has(n.id) && seen.add(n.id))
@@ -32,7 +36,7 @@ export function buildLayout(
   while (upQueue.length > 0) {
     const node = upQueue.shift()!
     for (const depName of node.deps ?? []) {
-      const dep = findNode(depName)
+      const dep = findNode(depName, node.id)
       if (!dep) continue
       upstreamEdges.push([dep.id, node.id])
       if (!seen.has(dep.id)) {
@@ -50,7 +54,7 @@ export function buildLayout(
   while (queue.length > 0) {
     const node = queue.shift()!
     for (const subName of node.subs ?? []) {
-      const sub = findNode(subName)
+      const sub = findNode(subName, node.id)
       if (!sub) continue
       downstreamEdges.push([node.id, sub.id])
       if (!seen.has(sub.id)) {
