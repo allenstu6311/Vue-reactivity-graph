@@ -160,40 +160,29 @@ export function collectInstance(
       // 連結父層 node（父層已在 Phase 1 先被蒐集）
       let parentNode: GraphNode | undefined;
 
-      // Strategy 1: 同名查找（適用所有同名 prop，包含 ref / reactive）
-      if (parentRawSetupState) {
-        const sameNameVal = (parentRawSetupState as any)[propKey];
-        if (sameNameVal && typeof sameNameVal === "object") {
-          parentNode =
-            injectRawToNodeMap.get(sameNameVal) ?? valNodeMap.get(sameNameVal);
-        }
-      }
+      // sentinel dry-run prop map
+      const parentChildPropMap = instance.parent
+        ? instanceChildPropKeyMap.get(instance.parent)
+        : undefined;
 
-      // Strategy 2: sentinel dry-run prop map（適用不同名 prop）
-      if (!parentNode) {
-        const parentChildPropMap = instance.parent
-          ? instanceChildPropKeyMap.get(instance.parent)
-          : undefined;
+      const sourceKey = parentChildPropMap
+        ?.get(instance.type as unknown as object)
+        ?.get(propKey);
 
-        const sourceKey = parentChildPropMap
-          ?.get(instance.type as unknown as object)
-          ?.get(propKey);
-
-        if (sourceKey) {
-          if (sourceKey.startsWith("prop") && instance.parent?.props) {
-            // 來源是父層的 prop，走 propKeyNodeMap 查找
-            const parentPropKey = sourceKey.slice(6);
-            const parentRawPropsObj = ((instance.parent.props as any).__v_raw ??
-              instance.parent.props) as object;
-            parentNode = propKeyNodeMap
-              .get(parentRawPropsObj)
-              ?.get(parentPropKey);
-          } else if (parentRawSetupState) {
-            const sourceRaw = (parentRawSetupState as any)[sourceKey];
-            if (sourceRaw)
-              parentNode =
-                injectRawToNodeMap.get(sourceRaw) ?? valNodeMap.get(sourceRaw);
-          }
+      if (sourceKey) {
+        if (sourceKey.startsWith("props.") && instance.parent?.props) {
+          // props.test => test
+          const parentPropKey = sourceKey.slice(6);
+          const parentRawPropsObj = ((instance.parent.props as any).__v_raw ??
+            instance.parent.props) as object;
+          parentNode = propKeyNodeMap
+            .get(parentRawPropsObj)
+            ?.get(parentPropKey);
+        } else if (parentRawSetupState) {
+          const sourceRaw = (parentRawSetupState as any)[sourceKey];
+          if (sourceRaw)
+            parentNode =
+              injectRawToNodeMap.get(sourceRaw) ?? valNodeMap.get(sourceRaw);
         }
       }
 
@@ -324,7 +313,7 @@ export function collectInstance(
     const savedSetupState = instance.setupState;
     instance.setupState = sentinelProxy as any;
     let dryRunVNode: any = null;
-    
+
     // dry-run 時 currentRenderingInstance 為 null，resolveComponent 會發出警告但仍 fallback 回字串
     // 我們已透過 resolveGlobalComponent 處理此 fallback，暫時靜音避免 console 噪音
     const origWarn = console.warn;
@@ -344,7 +333,7 @@ export function collectInstance(
     } catch {
       // ignore render errors during dry-run
     } finally {
-      console.warn = origWarn
+      console.warn = origWarn;
     }
 
     instance.setupState = savedSetupState;
