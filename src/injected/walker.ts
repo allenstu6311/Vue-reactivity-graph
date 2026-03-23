@@ -324,6 +324,11 @@ export function collectInstance(
     const savedSetupState = instance.setupState;
     instance.setupState = sentinelProxy as any;
     let dryRunVNode: any = null;
+    
+    // dry-run 時 currentRenderingInstance 為 null，resolveComponent 會發出警告但仍 fallback 回字串
+    // 我們已透過 resolveGlobalComponent 處理此 fallback，暫時靜音避免 console 噪音
+    const origWarn = console.warn;
+    console.warn = () => {};
     try {
       //編譯後的 render 函數簽名為 (ctx, cache, $props, $setup, $data, $options)
       // $setup 必須傳入 sentinelProxy，模板的 _ctx.xxx 才會存取到 sentinel 值
@@ -338,7 +343,10 @@ export function collectInstance(
       );
     } catch {
       // ignore render errors during dry-run
+    } finally {
+      console.warn = origWarn
     }
+
     instance.setupState = savedSetupState;
 
     if (dryRunVNode) {
@@ -350,9 +358,6 @@ export function collectInstance(
         childPropMap,
         instance.appContext,
       );
-
-        console.log("dryRunVNode", dryRunVNode);
-        console.log('childPropMap', childPropMap)
 
       if (childPropMap.size > 0) {
         instanceChildPropKeyMap.set(instance, childPropMap);

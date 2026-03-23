@@ -10,7 +10,7 @@ function buildNode(
   val: ComputedRefImpl | any,
   componentName: string,
   file: string,
-): GraphNode {
+): GraphNode | null {
   const id = `${componentName}.${key}`;
 
   //val.fn 是 Vue 3.5 ComputedRefImpl 的內部 getter，未公開 API，用來識別 computed
@@ -49,31 +49,35 @@ function buildNode(
     };
   }
 
-  // reactive proxy — snapshot，過濾 Vue internal 和 __vrg_depKey
-  const snapshot = Object.fromEntries(
-    Object.entries(val as unknown as Record<string, unknown>).filter(
-      ([k]) => !k.startsWith("__v_") && k !== "__vrg_depKey",
-    ),
-  );
+  if (val.__v_isReactive) {
+    // reactive proxy — snapshot，過濾 Vue internal 和 __vrg_depKey
+    const snapshot = Object.fromEntries(
+      Object.entries(val as unknown as Record<string, unknown>).filter(
+        ([k]) => !k.startsWith("__v_") && k !== "__vrg_depKey",
+      ),
+    );
 
-  return {
-    id,
-    varName: key,
-    type: "reactive",
-    val: snapshot,
-    file,
-    deps: [],
-    subs: [],
-  };
+    return {
+      id,
+      varName: key,
+      type: "reactive",
+      val: snapshot,
+      file,
+      deps: [],
+      subs: [],
+    };
+  }
+
+  return null;
 }
 
 interface CollectSetupStateParams {
-  rawSetupState: RawSetupState
-  componentName: string
-  file: string
-  nodes: GraphNode[]
-  valNodeMap: WeakMap<object, GraphNode>
-  skipKeys?: Set<string>
+  rawSetupState: RawSetupState;
+  componentName: string;
+  file: string;
+  nodes: GraphNode[];
+  valNodeMap: WeakMap<object, GraphNode>;
+  skipKeys?: Set<string>;
 }
 
 // Phase 1: 建 node、存 valNodeMap
@@ -85,7 +89,7 @@ export function collectSetupState({
   valNodeMap,
   skipKeys,
 }: CollectSetupStateParams): void {
-  console.log("rawSetupState", rawSetupState);
+  // console.log("rawSetupState", rawSetupState);
   for (const key in rawSetupState) {
     if (key === "props") continue;
     if (skipKeys?.has(key)) continue;
@@ -105,8 +109,10 @@ export function collectSetupState({
     // 直接將 key 掛在物件上，讓 onTrack 能取得對應的 varName
     val.__vrg_depKey = key;
     const node = buildNode(key, val, componentName, file);
-    valNodeMap.set(val, node);
-    nodes.push(node);
+    if (node) {
+      valNodeMap.set(val, node);
+      nodes.push(node);
+    }
   }
 }
 
@@ -132,11 +138,11 @@ export function resolveDepNode(
 }
 
 interface BindSetupTrackParams {
-  rawSetupState: RawSetupState
-  componentName: string
-  valNodeMap: WeakMap<object, GraphNode>
-  propKeyNodeMap: WeakMap<object, Map<string, GraphNode>>
-  injectRawToLocalNode: Map<object, GraphNode>
+  rawSetupState: RawSetupState;
+  componentName: string;
+  valNodeMap: WeakMap<object, GraphNode>;
+  propKeyNodeMap: WeakMap<object, Map<string, GraphNode>>;
+  injectRawToLocalNode: Map<object, GraphNode>;
 }
 
 // Phase 2: 設 onTrack + 觸發 computed
@@ -153,8 +159,6 @@ export function bindSetupTrack({
     if (val?.fn) {
       val.onTrack = (event: TrackEvent) => {
         const subNode = valNodeMap.get(val as object)!;
-        console.log("event", event);
-        console.log("subNode", subNode);
         //Pinia store 的 state 物件沒有 __vrg_depKey，fallback 用 event.key（被存取的屬性名）當作 dep 名稱
         const depName = event.target.__vrg_depKey ?? String(event.key);
         if (!subNode.deps.includes(depName)) subNode.deps.push(depName);
@@ -168,7 +172,6 @@ export function bindSetupTrack({
           propKeyNodeMap,
           injectRawToLocalNode,
         );
-        console.log("depNode", depNode);
         if (depNode) {
           // prop / inject 的 subscriber 跨 component 查找時需要完整 ID
           const subName =
