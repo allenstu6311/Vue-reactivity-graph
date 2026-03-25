@@ -97,14 +97,6 @@ export function collectSetupState({
 
     if (typeof val !== "object" || val === null) continue;
 
-    // const existingNode = valNodeMap.get(val);
-    // if (existingNode) {
-    //   // 這個 val 已經被父層（或 store）註冊過
-    //   // → 這是 inject 來的，直接建連結就好
-    //   // 不用建新 node，existingNode 就是來源
-    //   return;
-    // }
-
     //onTrack 只拿得到 event.target（響應式物件本身），無法直接得知變數名
     // 直接將 key 掛在物件上，讓 onTrack 能取得對應的 varName
     val.__vrg_depKey = key;
@@ -159,6 +151,7 @@ export function bindSetupTrack({
     if (val?.fn) {
       val.onTrack = (event: TrackEvent) => {
         const subNode = valNodeMap.get(val as object)!;
+        // console.log('subNode', subNode)
         //Pinia store 的 state 物件沒有 __vrg_depKey，fallback 用 event.key（被存取的屬性名）當作 dep 名稱
         const depName = event.target.__vrg_depKey ?? String(event.key);
         if (!subNode.deps.includes(depName)) subNode.deps.push(depName);

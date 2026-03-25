@@ -113,7 +113,6 @@ export function collectInstance(
   instance: ExtendedComponentInstance,
   prevComponentName?: string,
 ): void {
-  // console.log('instance', instance.appContext)
 
   const file =
     ((instance.type as Record<string, unknown>).__name as string) ||
