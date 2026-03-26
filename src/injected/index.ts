@@ -1,5 +1,4 @@
-import { collectInstance, triggerInstance } from "./walker";
-import type { HmrInfo } from "./walker";
+import { collectInstance, triggerInstance, setHmrOverride, deleteHmrOverride } from "./walker";
 import type { ExtendedComponentInstance } from "../types/vue-internals";
 import { clearGraph, getGraph, setOnUpdate } from "../graph";
 import type { NodeType } from "../graph";
@@ -79,9 +78,10 @@ if (app) {
       const hmrId: string | undefined = (instance?.type as any)?.__hmrId;
       if (hmrId && pendingHmrIds.has(hmrId)) {
         pendingHmrIds.delete(hmrId);
-        const newInfo: HmrInfo = { id: hmrId, newInstance: instance };
-        collectInstance(vueApp._instance, undefined, newInfo);
-        triggerInstance(vueApp._instance, undefined, newInfo);
+        setHmrOverride(hmrId, instance);
+        collectInstance(vueApp._instance);
+        triggerInstance(vueApp._instance);
+        deleteHmrOverride(hmrId);
         refreshGraph();
       }
     }

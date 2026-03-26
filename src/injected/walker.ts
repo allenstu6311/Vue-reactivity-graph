@@ -14,16 +14,19 @@ const propKeyNodeMap = new WeakMap<object, Map<string, GraphNode>>();
 const injectRawToNodeMap = new WeakMap<object, GraphNode>();
 import { GraphNode, updateGraph, getGraph, notifyUpdate } from "../graph";
 
-export interface HmrInfo {
-  id: string;
-  newInstance: ExtendedComponentInstance;
+const hmrOverrideMap = new Map<string, ExtendedComponentInstance>();
+
+export function setHmrOverride(id: string, instance: ExtendedComponentInstance): void {
+  hmrOverrideMap.set(id, instance);
 }
 
-function resolveInstance(
-  old: ExtendedComponentInstance,
-  newInfo?: HmrInfo,
-): ExtendedComponentInstance {
-  return newInfo && (old?.type as any)?.__hmrId === newInfo.id ? newInfo.newInstance : old;
+export function deleteHmrOverride(id: string): void {
+  hmrOverrideMap.delete(id);
+}
+
+function resolveInstance(old: ExtendedComponentInstance): ExtendedComponentInstance {
+  const hmrId = (old?.type as any)?.__hmrId;
+  return hmrId && hmrOverrideMap.has(hmrId) ? hmrOverrideMap.get(hmrId)! : old;
 }
 
 // parent sentinel dry-run 建立的 childType → propName → parentSetupKey 對應
@@ -124,9 +127,8 @@ function traverseVNodeForSentinels(
 export function collectInstance(
   oldInstance: ExtendedComponentInstance,
   prevComponentName?: string,
-  newInfo?: HmrInfo,
 ): void {
-  const instance = resolveInstance(oldInstance, newInfo);
+  const instance = resolveInstance(oldInstance);
 
   const file =
     ((instance.type as Record<string, unknown>).__name as string) ||
@@ -391,9 +393,8 @@ export function collectVNode(vnode: VNode, prevComponentName?: string): void {
 export function triggerInstance(
   oldInstance: ExtendedComponentInstance,
   prevComponentName?: string,
-  newInfo?: HmrInfo,
 ): void {
-  const instance = resolveInstance(oldInstance, newInfo);
+  const instance = resolveInstance(oldInstance);
   const file =
     ((instance.type as Record<string, unknown>).__name as string) ||
     ((instance.type as Record<string, unknown>).name as string) ||
