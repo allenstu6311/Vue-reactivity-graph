@@ -1,4 +1,5 @@
 import { collectInstance, triggerInstance } from "./walker";
+import type { HmrInfo } from "./walker";
 import type { ExtendedComponentInstance } from "../types/vue-internals";
 import { clearGraph, getGraph, setOnUpdate } from "../graph";
 import type { NodeType } from "../graph";
@@ -17,7 +18,7 @@ const hmr = (window as any).__VUE_HMR_RUNTIME__;
 
 const hook = (window as any).__VUE_DEVTOOLS_GLOBAL_HOOK__;
 const originalEmit = hook.emit.bind(hook);
-let pendingReloadId: string | null = null;
+const pendingHmrIds = new Set<string>();
 
 if (app) {
   function sanitizeVal(val: unknown, type: NodeType): unknown {
@@ -50,44 +51,38 @@ if (app) {
     );
   
     (window as unknown as Record<string, unknown>).__vueReactivityGraph = plain;
-      // console.log('plain', plain)
+      console.log('plain', plain)
     window.postMessage({ type: "VUE_GRAPH_UPDATE" }, "*");
   }
 
   if (hmr) {
     const originalReload = hmr.reload;
-    const originalRender = hmr.rerender
+    const originalRender = hmr.rerender;
 
     hmr.reload = function (id: string, newComp: any) {
-      console.log('reload')
-      pendingReloadId = id;
+      pendingHmrIds.add(id);
       return originalReload.call(this, id, newComp);
     };
 
     hmr.rerender = function (id: string, newComp: any) {
-      console.log('rerender')
-      pendingReloadId = id;
+      pendingHmrIds.add(id);
       return originalRender.call(this, id, newComp);
     };
   }
 
   hook.emit = function (event: string, ...args: any[]) {
-    // console.log('event', event, 'arg', args)
-
     if (
-      (event === "component:added"
-        || event === "component:updated"
-      ) 
-      && pendingReloadId !== null) {
-
-      const [app, uid, parentUid, instance] = args;
-      // 等被 reload 的 component 掛載後才全掃，避免同一次 HMR 重複觸發
-      if (instance?.type?.__hmrId === pendingReloadId) {
-            // console.log('instance', instance)
-        collectInstance(app._instance);
-        triggerInstance(app._instance);
+      (event === "component:added" || event === "component:updated") &&
+      pendingHmrIds.size > 0
+    ) {
+      const [vueApp, , , instance] = args;
+      const hmrId: string | undefined = (instance?.type as any)?.__hmrId;
+      if (hmrId && pendingHmrIds.has(hmrId)) {
+        pendingHmrIds.delete(hmrId);
+        const newInfo: HmrInfo = { id: hmrId, newInstance: instance };
+        collectInstance(vueApp._instance, undefined, newInfo);
+        triggerInstance(vueApp._instance, undefined, newInfo);
         refreshGraph();
-        pendingReloadId = null;
       }
     }
     return originalEmit(event, ...args);

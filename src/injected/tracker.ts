@@ -151,7 +151,6 @@ export function bindSetupTrack({
     if (val?.fn) {
       val.onTrack = (event: TrackEvent) => {
         const subNode = valNodeMap.get(val as object)!;
-        // console.log('subNode', subNode)
         //Pinia store 的 state 物件沒有 __vrg_depKey，fallback 用 event.key（被存取的屬性名）當作 dep 名稱
         const depName = event.target.__vrg_depKey ?? String(event.key);
         if (!subNode.deps.includes(depName)) subNode.deps.push(depName);

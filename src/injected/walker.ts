@@ -14,6 +14,18 @@ const propKeyNodeMap = new WeakMap<object, Map<string, GraphNode>>();
 const injectRawToNodeMap = new WeakMap<object, GraphNode>();
 import { GraphNode, updateGraph, getGraph, notifyUpdate } from "../graph";
 
+export interface HmrInfo {
+  id: string;
+  newInstance: ExtendedComponentInstance;
+}
+
+function resolveInstance(
+  old: ExtendedComponentInstance,
+  newInfo?: HmrInfo,
+): ExtendedComponentInstance {
+  return newInfo && (old?.type as any)?.__hmrId === newInfo.id ? newInfo.newInstance : old;
+}
+
 // parent sentinel dry-run 建立的 childType → propName → parentSetupKey 對應
 const instanceChildPropKeyMap = new WeakMap<
   object,
@@ -110,9 +122,11 @@ function traverseVNodeForSentinels(
 
 // Phase 1: 蒐集所有節點，不觸發任何訂閱者
 export function collectInstance(
-  instance: ExtendedComponentInstance,
+  oldInstance: ExtendedComponentInstance,
   prevComponentName?: string,
+  newInfo?: HmrInfo,
 ): void {
+  const instance = resolveInstance(oldInstance, newInfo);
 
   const file =
     ((instance.type as Record<string, unknown>).__name as string) ||
@@ -375,9 +389,11 @@ export function collectVNode(vnode: VNode, prevComponentName?: string): void {
 
 // Phase 2: 觸發所有訂閱者，此時所有 node 已蒐集完畢
 export function triggerInstance(
-  instance: ExtendedComponentInstance,
+  oldInstance: ExtendedComponentInstance,
   prevComponentName?: string,
+  newInfo?: HmrInfo,
 ): void {
+  const instance = resolveInstance(oldInstance, newInfo);
   const file =
     ((instance.type as Record<string, unknown>).__name as string) ||
     ((instance.type as Record<string, unknown>).name as string) ||
