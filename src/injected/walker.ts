@@ -17,6 +17,20 @@ const propSourceInjectMap = new WeakMap<object, GraphNode>();
 
 const hmrOverrideMap = new Map<string, ExtendedComponentInstance>();
 
+// 記錄每個 componentName 出現的次數，用於同名 component 多實例時產生唯一 graph key
+const componentKeyCountMap = new Map<string, number>();
+
+// parent sentinel dry-run 建立的 childType → { maps, nextIndex } 對應
+// maps 按 vnode 出現順序存 propMap，nextIndex 追蹤下一個子 instance 該取第幾個
+const instanceChildPropKeyMap = new WeakMap<
+  object,
+  Map<object, { maps: Map<string, string>[]; nextIndex: number }>
+>();
+
+export function resetComponentKeyCounts(): void {
+  componentKeyCountMap.clear();
+}
+
 export function setHmrOverride(
   id: string,
   instance: ExtendedComponentInstance,
@@ -35,12 +49,6 @@ function resolveInstance(
   return hmrId && hmrOverrideMap.has(hmrId) ? hmrOverrideMap.get(hmrId)! : old;
 }
 
-// parent sentinel dry-run 建立的 childType → propName → parentSetupKey 對應
-const instanceChildPropKeyMap = new WeakMap<
-  object,
-  Map<object, Map<string, string>>
->();
-
 // 對齊 Vue 的 resolveAsset 邏輯：exact → camelCase → PascalCase
 function resolveGlobalComponent(
   appContext: any,
@@ -58,7 +66,7 @@ function traverseVNodeForSentinels(
   vnode: any,
   sentinelToKey: Map<symbol, string>,
   rawSetupState: object,
-  result: Map<object, Map<string, string>>,
+  result: Map<object, { maps: Map<string, string>[]; nextIndex: number }>,
   appContext: any,
 ): void {
   if (!vnode || typeof vnode !== "object") return;
@@ -87,7 +95,12 @@ function traverseVNodeForSentinels(
         }
       }
       if (propMap.size > 0) {
-        result.set(resolvedType as object, propMap);
+        const existing = result.get(resolvedType as object);
+        if (existing) {
+          existing.maps.push(propMap);
+        } else {
+          result.set(resolvedType as object, { maps: [propMap], nextIndex: 0 });
+        }
       }
     }
   }
@@ -164,6 +177,14 @@ export function collectInstance(
     // 因此另開 propKeyNodeMap，讓 onTrack 能從 props raw object 查到對應的 prop node
     propKeyNodeMap.set(rawPropsObj, propMap);
 
+    const parentChildPropMap = instance.parent
+      ? instanceChildPropKeyMap.get(instance.parent)
+      : undefined;
+
+    const typeData = parentChildPropMap?.get(instance.type as unknown as object);
+    const siblingIndex = typeData?.nextIndex ?? 0;
+    if (typeData) typeData.nextIndex++;
+
     for (const propKey in propsOptions) {
       const propNode: GraphNode = {
         id: `${componentName}.${propKey}`,
@@ -182,13 +203,7 @@ export function collectInstance(
       let parentNode: GraphNode | undefined;
 
       // sentinel dry-run prop map
-      const parentChildPropMap = instance.parent
-        ? instanceChildPropKeyMap.get(instance.parent)
-        : undefined;
-
-      const sourceKey = parentChildPropMap
-        ?.get(instance.type as unknown as object)
-        ?.get(propKey);
+      const sourceKey = typeData?.maps[siblingIndex]?.get(propKey);
 
       if (sourceKey) {
         if (sourceKey.startsWith("props.") && instance.parent?.props) {
@@ -360,7 +375,7 @@ export function collectInstance(
     instance.setupState = savedSetupState;
 
     if (dryRunVNode) {
-      const childPropMap = new Map<object, Map<string, string>>();
+      const childPropMap = new Map<object, { maps: Map<string, string>[]; nextIndex: number }>();
       traverseVNodeForSentinels(
         dryRunVNode,
         sentinelToKey,
@@ -375,7 +390,10 @@ export function collectInstance(
     }
   }
 
-  updateGraph(componentName, nodes);
+  const count = componentKeyCountMap.get(componentName) ?? 0;
+  componentKeyCountMap.set(componentName, count + 1);
+  const graphKey = count === 0 ? componentName : `${componentName}_${count}`;
+  updateGraph(graphKey, nodes);
   collectVNode(instance.subTree, componentName);
 }
 
@@ -411,7 +429,10 @@ export function triggerInstance(
     : file;
 
   const rawSetupState = instance.setupState?.["__v_raw"] || {};
-  const nodes = getGraph()[componentName] ?? [];
+  const count = componentKeyCountMap.get(componentName) ?? 0;
+  componentKeyCountMap.set(componentName, count + 1);
+  const graphKey = count === 0 ? componentName : `${componentName}_${count}`;
+  const nodes = getGraph()[graphKey] ?? [];
 
   // per-component inject lookup：raw → injectNode，供 Phase 2 onTrack resolveDepNode 使用
   // 每次 triggerInstance 重建：A、B 兩個兄弟 component 若 inject 同一個 provide 值（同一 raw object），

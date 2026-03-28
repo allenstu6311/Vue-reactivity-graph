@@ -1,4 +1,4 @@
-import { collectInstance, triggerInstance, setHmrOverride, deleteHmrOverride } from "./walker";
+import { collectInstance, triggerInstance, setHmrOverride, deleteHmrOverride, resetComponentKeyCounts } from "./walker";
 import type { ExtendedComponentInstance } from "../types/vue-internals";
 import { clearGraph, getGraph, setOnUpdate } from "../graph";
 import type { NodeType } from "../graph";
@@ -79,7 +79,9 @@ if (app) {
       if (hmrId && pendingHmrIds.has(hmrId)) {
         pendingHmrIds.delete(hmrId);
         setHmrOverride(hmrId, instance);
+        resetComponentKeyCounts();
         collectInstance(vueApp._instance);
+        resetComponentKeyCounts();
         triggerInstance(vueApp._instance);
         deleteHmrOverride(hmrId);
         refreshGraph();
@@ -89,7 +91,9 @@ if (app) {
   };
 
   setOnUpdate(refreshGraph);
+  resetComponentKeyCounts();
   collectInstance(app);
+  resetComponentKeyCounts();
   triggerInstance(app);
   refreshGraph();
 }
