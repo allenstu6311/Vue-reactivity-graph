@@ -5,18 +5,22 @@ import type {
   TrackerDebuggerEvent,
 } from "../types/vue-internals";
 import { collectSetupState, bindSetupTrack, resolveDepNode } from "./tracker";
+import { GraphNode, updateGraph, getGraph, notifyUpdate } from "../graph";
 
 // WeakMap：避免把 __node reference 直接掛在 Vue 物件上造成循環引用
 const valNodeMap = new WeakMap<object, GraphNode>();
 // WeakMap：props raw object → Map<propKey, GraphNode>
 const propKeyNodeMap = new WeakMap<object, Map<string, GraphNode>>();
-// WeakMap：inject raw value → injectNode（Phase 1 用，深度優先保證父層先寫，子層 prop 連結才查）
-const injectRawToNodeMap = new WeakMap<object, GraphNode>();
-import { GraphNode, updateGraph, getGraph, notifyUpdate } from "../graph";
+// WeakMap：inject raw → injectNode，專供 Phase 1 prop 來源解析使用
+// 父層寫入後，子層 prop 連結時反查
+const propSourceInjectMap = new WeakMap<object, GraphNode>();
 
 const hmrOverrideMap = new Map<string, ExtendedComponentInstance>();
 
-export function setHmrOverride(id: string, instance: ExtendedComponentInstance): void {
+export function setHmrOverride(
+  id: string,
+  instance: ExtendedComponentInstance,
+): void {
   hmrOverrideMap.set(id, instance);
 }
 
@@ -24,7 +28,9 @@ export function deleteHmrOverride(id: string): void {
   hmrOverrideMap.delete(id);
 }
 
-function resolveInstance(old: ExtendedComponentInstance): ExtendedComponentInstance {
+function resolveInstance(
+  old: ExtendedComponentInstance,
+): ExtendedComponentInstance {
   const hmrId = (old?.type as any)?.__hmrId;
   return hmrId && hmrOverrideMap.has(hmrId) ? hmrOverrideMap.get(hmrId)! : old;
 }
@@ -197,7 +203,7 @@ export function collectInstance(
           const sourceRaw = (parentRawSetupState as any)[sourceKey];
           if (sourceRaw)
             parentNode =
-              injectRawToNodeMap.get(sourceRaw) ?? valNodeMap.get(sourceRaw);
+              propSourceInjectMap.get(sourceRaw) ?? valNodeMap.get(sourceRaw);
         }
       }
 
@@ -246,9 +252,9 @@ export function collectInstance(
         }
         nodes.push(injectNode);
         // 不覆寫 valNodeMap，避免兄弟元件處理時互蓋
-        // 寫入 injectRawToNodeMap，讓子層 prop 連結能查到此 inject node（深度優先保證父層先寫）
+        // 寫入 propSourceInjectMap，讓子層 prop 連結能查到此 inject node（深度優先保證父層先寫）
         const injectRaw = (val as any).__v_raw ?? val;
-        injectRawToNodeMap.set(injectRaw as object, injectNode);
+        propSourceInjectMap.set(injectRaw as object, injectNode);
       }
     }
   }
@@ -407,8 +413,9 @@ export function triggerInstance(
   const rawSetupState = instance.setupState?.["__v_raw"] || {};
   const nodes = getGraph()[componentName] ?? [];
 
-  // 建 per-component inject lookup：raw → injectNode
-  // 區域 Map，不污染全域 valNodeMap，兄弟 component 不互蓋
+  // per-component inject lookup：raw → injectNode，供 Phase 2 onTrack resolveDepNode 使用
+  // 每次 triggerInstance 重建：A、B 兩個兄弟 component 若 inject 同一個 provide 值（同一 raw object），
+  // 共用全域 Map 會互蓋，導致 A 的 onTrack 查到 B 的 injectNode，連線接錯對象
   const injectRawToLocalNode = new Map<object, GraphNode>();
   for (const node of nodes) {
     if (node.type !== "inject") continue;
