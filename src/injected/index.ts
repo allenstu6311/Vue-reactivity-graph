@@ -1,6 +1,6 @@
 import { collectInstance, triggerInstance, setHmrOverride, deleteHmrOverride, resetComponentKeyCounts } from "./walker";
 import type { ExtendedComponentInstance } from "../types/vue-internals";
-import { clearGraph, getGraph, setOnUpdate } from "../graph";
+import { getGraph, setOnUpdate } from "../graph";
 import type { NodeType } from "../graph";
 
 interface VueAppInternals {
@@ -50,7 +50,7 @@ if (app) {
     );
   
     (window as unknown as Record<string, unknown>).__vueReactivityGraph = plain;
-      console.log('plain', plain)
+      // console.log('plain', plain)
     window.postMessage({ type: "VUE_GRAPH_UPDATE" }, "*");
   }
 
