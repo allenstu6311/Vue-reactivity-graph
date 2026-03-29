@@ -2,6 +2,11 @@ import type { ComponentInternalInstance, EffectScope, ReactiveEffect } from 'vue
 import type { DebuggerEvent } from 'vue'
 import type { GraphNode } from '../graph/types'
 
+/**
+ * 目前因為會手動自己加key來協助判斷，所以先用any
+ */
+export type Data = Record<string, any>
+
 // 被追蹤的響應式物件（ref、reactive、pinia store state）
 export interface TrackedTarget {
   __vrg_depKey?: string
@@ -16,13 +21,6 @@ export interface TrackEvent {
   key: string | symbol
 }
 
-// Vue 內部 ReactiveEffect（未公開 export）
-// export interface ReactiveEffect {
-//   onTrack?: (event: TrackEvent) => void
-//   run(): unknown
-//   // 我們自行附加的屬性
-//   __depList?: Map<string, string>
-// }
 export type WatchEffects = ReactiveEffect
 
 export type TrackerDebuggerEvent = DebuggerEvent & {
@@ -47,19 +45,15 @@ export type RawSetupState = Record<string, ComputedRefImpl>
 
 // 擴充 EffectScope，加入 Vue 未公開的 effects 欄位
 export interface ExtendedEffectScope extends EffectScope {
-  effects: WatchEffects[]
+  effects: ReactiveEffect[]
 }
 
 // 擴充 ComponentInternalInstance，加入 Vue 未公開的內部欄位
 export interface ExtendedComponentInstance extends ComponentInternalInstance {
-  setupState: Record<string, unknown> & { __v_raw?: RawSetupState }
+  setupState: Data
   scope?: ExtendedEffectScope
-  provides?: Record<string | symbol, unknown>
-  // effect?: ReactiveEffect
-  // subTree: VNode
-  // type: {
-  //   __name?: string
-  //   [key: string]: unknown
-  // }
+  provides?: Data
+  propsOptions: [Record<string, unknown>, string[]]
+  parent: ExtendedComponentInstance | null
 }
 

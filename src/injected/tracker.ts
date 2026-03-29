@@ -3,6 +3,7 @@ import type {
   ComputedRefImpl,
   RawSetupState,
   TrackEvent,
+  Data
 } from "../types/vue-internals";
 
 function buildNode(
@@ -72,7 +73,7 @@ function buildNode(
 }
 
 interface CollectSetupStateParams {
-  rawSetupState: RawSetupState;
+  rawSetupState: Data;
   componentName: string;
   file: string;
   nodes: GraphNode[];
