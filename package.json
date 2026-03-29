@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite build --watch",
     "build": "vite build",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "vue-tsc --noEmit",
     "test": "vitest run"
   },
   "devDependencies": {
@@ -16,7 +16,8 @@
     "typescript": "^5.7.3",
     "vite": "^6.2.0",
     "vitest": "^4.1.0",
-    "vue": "^3.5.13"
+    "vue": "^3.5.13",
+    "vue-tsc": "^3.2.6"
   },
   "dependencies": {
     "@dagrejs/dagre": "^2.0.4",
