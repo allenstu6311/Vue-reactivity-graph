@@ -154,9 +154,14 @@ export function collectInstance(
     ((instance.type as Record<string, unknown>).name as string) ||
     "Anonymous";
 
-  const componentName = prevComponentName
+  const baseComponentName = prevComponentName
     ? `${prevComponentName}.${file}`
     : file;
+
+  // 子組件重用
+  const count = componentKeyCountMap.get(baseComponentName) ?? 0;
+  componentKeyCountMap.set(baseComponentName, count + 1);
+  const componentName = count === 0 ? baseComponentName : `${baseComponentName}_${count}`;
 
   const nodes: GraphNode[] = [];
 
@@ -390,10 +395,7 @@ export function collectInstance(
     }
   }
 
-  const count = componentKeyCountMap.get(componentName) ?? 0;
-  componentKeyCountMap.set(componentName, count + 1);
-  const graphKey = count === 0 ? componentName : `${componentName}_${count}`;
-  updateGraph(graphKey, nodes);
+  updateGraph(componentName, nodes);
   collectVNode(instance.subTree, componentName);
 }
 
@@ -424,15 +426,15 @@ export function triggerInstance(
     ((instance.type as Record<string, unknown>).name as string) ||
     "Anonymous";
 
-  const componentName = prevComponentName
+  const baseComponentName = prevComponentName
     ? `${prevComponentName}.${file}`
     : file;
+  const count = componentKeyCountMap.get(baseComponentName) ?? 0;
+  componentKeyCountMap.set(baseComponentName, count + 1);
+  const componentName = count === 0 ? baseComponentName : `${baseComponentName}_${count}`;
 
   const rawSetupState = instance.setupState?.["__v_raw"] || {};
-  const count = componentKeyCountMap.get(componentName) ?? 0;
-  componentKeyCountMap.set(componentName, count + 1);
-  const graphKey = count === 0 ? componentName : `${componentName}_${count}`;
-  const nodes = getGraph()[graphKey] ?? [];
+  const nodes = getGraph()[componentName] ?? [];
 
   // per-component inject lookup：raw → injectNode，供 Phase 2 onTrack resolveDepNode 使用
   // 每次 triggerInstance 重建：A、B 兩個兄弟 component 若 inject 同一個 provide 值（同一 raw object），
