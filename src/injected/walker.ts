@@ -2,9 +2,8 @@ import type { DebuggerEvent, VNode } from "vue";
 import type {
   ExtendedComponentInstance,
   WatchEffects,
-  TrackerDebuggerEvent,
 } from "../types/vue-internals";
-import { collectSetupState, bindSetupTrack, resolveDepNode } from "./tracker";
+import { collectSetupState, bindSetupTrack, resolveDepNode, resolveDepName } from "./tracker";
 import { GraphNode, updateGraph, getGraph, notifyUpdate } from "../graph";
 
 // WeakMap：避免把 __node reference 直接掛在 Vue 物件上造成循環引用
@@ -471,16 +470,7 @@ export function triggerInstance(
       if (!watchNode) return;
 
       effect.onTrack = (event: DebuggerEvent) => {
-        const trackerEvent = event.target as TrackerDebuggerEvent;
-        // const depName =
-        //   trackerEvent.__vrg_depKey ??
-        //   (trackerEvent.$id ? String(event.key) : undefined);
-        const depName =
-          trackerEvent.__vrg_depKey ??
-          (trackerEvent.$id ? String(event.key) : undefined) ??
-          (propKeyNodeMap.has(event.target as object)
-            ? String(event.key)
-            : undefined);
+        const depName = resolveDepName(event.target as object, event.key, propKeyNodeMap);
         if (!depName) return;
 
         if (!watchNode.deps.includes(depName)) {

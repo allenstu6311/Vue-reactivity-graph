@@ -3,8 +3,19 @@ import type {
   ComputedRefImpl,
   RawSetupState,
   TrackEvent,
-  Data
+  Data,
 } from "../types/vue-internals";
+
+function isPiniaStore(val: unknown): boolean {
+  if (
+    typeof (val as any)?.$id === "string" &&
+    typeof (val as any)?.$patch === "function"
+  )
+    return true;
+  if ((val as any)?._key !== undefined && isPiniaStore((val as any)?._object))
+    return true;
+  return false;
+}
 
 function buildNode(
   key: string,
@@ -27,9 +38,7 @@ function buildNode(
     };
   }
 
-  //_key 是 Pinia store 的內部屬性，用來粗略識別 store 型別
-  // 目前以 "store" 作為統一類型名稱，之後需要更精確的判斷邏輯
-  if (val?._key) {
+  if (isPiniaStore(val)) {
     return { id, varName: key, type: "store", val, file, deps: [], subs: [] };
   }
 
@@ -95,7 +104,6 @@ export function collectSetupState({
     if (key === "props") continue;
     if (skipKeys?.has(key)) continue;
     const val = rawSetupState[key];
-
     if (typeof val !== "object" || val === null) continue;
 
     //onTrack 只拿得到 event.target（響應式物件本身），無法直接得知變數名
@@ -107,6 +115,18 @@ export function collectSetupState({
       nodes.push(node);
     }
   }
+}
+
+export function resolveDepName(
+  target: object,
+  key: string | symbol,
+  propKeyNodeMap: WeakMap<object, Map<string, GraphNode>>,
+): string | undefined {
+  return (
+    (isPiniaStore(target) ? String(key) : undefined) ??
+    (target as any).__vrg_depKey ??
+    (propKeyNodeMap.has(target) ? String(key) : undefined)
+  );
 }
 
 export function resolveDepNode(
@@ -146,14 +166,16 @@ export function bindSetupTrack({
   propKeyNodeMap,
   injectRawToLocalNode,
 }: BindSetupTrackParams): void {
+
   for (const key in rawSetupState) {
     const val = rawSetupState[key];
 
     if (val?.fn) {
       val.onTrack = (event: TrackEvent) => {
         const subNode = valNodeMap.get(val as object)!;
-        //Pinia store 的 state 物件沒有 __vrg_depKey，fallback 用 event.key（被存取的屬性名）當作 dep 名稱
-        const depName = event.target.__vrg_depKey ?? String(event.key);
+
+        const depName = resolveDepName(event.target as object, event.key, propKeyNodeMap);
+        if (!depName) return;
         if (!subNode.deps.includes(depName)) subNode.deps.push(depName);
 
         const depNode = resolveDepNode(
