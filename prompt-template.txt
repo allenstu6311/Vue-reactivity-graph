@@ -1,0 +1,17 @@
+1. 任務類型：[Bugfix / Feature / Refactor]
+2. 需求描述：
+(例如：讓 Provide/Inject 能支援跨多層 Component 的追蹤)
+
+3. 現況說明：
+
+涉及檔案：injected/tracker.ts
+
+當前問題：(描述問題或貼上原始碼/錯誤訊息)
+
+4. 驗收標準 (Acceptance Criteria)：
+
+[ ] 必須在 Phase 2 成功建立 injectRawToLocalNode。
+
+[ ] 不可影響到同層兄弟組件的 valNodeMap。
+
+[ ] 在 DevTools Panel 必須能看到 id 格式正確的 Link。

@@ -69,8 +69,57 @@ watch(double, () => {})                              // w_1：監聽 computed
 
 ## Phase 2 — Pinia Store 追蹤
 
-> 目標：store state 能被 computed / watch 正確追蹤為依賴
-> 狀態：待規劃，會新增更多複雜案例
+> 目標：store 的 ref / reactive / computed 透過 `storeToRefs` 解構後，能被 component 的 computed / watch 正確追蹤為依賴
+
+**測試檔案**：`src/injected/__tests__/pinia.test.ts`
+
+**測試 store（setup syntax）**：
+
+```ts
+const useTestStore = defineStore('test', () => {
+  const count  = ref(0)
+  const items  = reactive({ size: 0 })
+  const double = computed(() => count.value * 2)
+  return { count, items, double }
+})
+```
+
+**測試 app**：
+
+```ts
+// component name: "TestComp"
+const testStore = useTestStore()
+const { count, items, double } = storeToRefs(testStore)  // 解構讓每個屬性進 rawSetupState，取得獨立 __vrg_depKey
+const fromRef      = computed(() => count.value * 2)     // 讀 store ref
+const fromReactive = computed(() => items.value)         // 讀 store reactive（storeToRefs 包成 ref，不讀巢狀屬性）
+const fromComputed = computed(() => double.value + 1)    // 讀 store computed getter
+watch(count, () => {})                                   // w_0：watch store ref
+return { testStore, count, items, double, fromRef, fromReactive, fromComputed }
+```
+
+> `storeToRefs` 將 store 的 ref / reactive / computed 包成 `ObjectRefImpl` 回傳，`_object` 指向 Pinia store，因此 `count` / `items` / `double` 在 graph 裡的 type 均為 `"store"`
+
+**驗收標準（expected graph）**：
+
+```js
+{
+  TestComp: [
+    { id: "TestComp.testStore",    varName: "testStore",    type: "store",    deps: [],         subs: [] },
+    { id: "TestComp.count",        varName: "count",        type: "store",    deps: [],         subs: ["fromRef", "w_0"] },
+    { id: "TestComp.items",        varName: "items",        type: "store",    deps: [],         subs: ["fromReactive"] },
+    { id: "TestComp.double",       varName: "double",       type: "store",    deps: [],         subs: ["fromComputed"] },
+    { id: "TestComp.fromRef",      varName: "fromRef",      type: "computed", deps: ["count"],  subs: [] },
+    { id: "TestComp.fromReactive", varName: "fromReactive", type: "computed", deps: ["items"],  subs: [] },
+    { id: "TestComp.fromComputed", varName: "fromComputed", type: "computed", deps: ["double"], subs: [] },
+    { id: "TestComp.w_0",          varName: "w_0",          type: "watch",    deps: ["count"],  subs: [] },
+  ]
+}
+```
+
+> 節點總數：8
+
+**`test-utils.ts` 調整**：  
+`app.use(createPinia())` 加在 `app.mount(container)` 之前。
 
 ---
 
@@ -174,6 +223,7 @@ ParentComp
 src/injected/__tests__/
   test-utils.ts       ← 共用 helper：建 Vue app、執行 walker 完整流程、回傳 graph
   basic.test.ts       ← Phase 1：單一元件基礎驗證
+  pinia.test.ts       ← Phase 2：Pinia Store 追蹤
   props.test.ts       ← Phase 3：Props 基礎傳遞
   inject.test.ts      ← Phase 4：Provide / Inject
   edge-cases.test.ts  ← Phase 5：極端情境

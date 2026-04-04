@@ -106,11 +106,60 @@ Vue App（頁面）
 
 ## 啟動指令
 
-請在每次對話開始時讀取 `ARCHITECTURE.md`。
+請在每次對話開始時讀取 `ARCHITECTURE.md`與 `DESIGN_NOTES.md`。
 
 ---
 
-## 禁止事項
+## Guardrails
 
-- 不要動UI.html
+- 資訊不足時必須提問
 - 除非有我同意，不然不直接修改代碼
+- 不可假設未提供的資訊
+- 不可跳過分析直接給最終答案
+
+## Thought Process Protocol
+
+1. **Context Mapping**: 
+   - 優先研讀 `ARCHITECTURE.md` 建立全域觀。
+   - 識別本次任務涉及的核心組件與設計模式。
+
+2. **Impact Analysis (Data & Logic Flow)**:
+   - 追蹤資料從進入點到儲存/輸出的路徑。
+   - 標註受影響的 API、Types、以及 Test Suites。
+
+3. **Solution Architecture**:
+   - 對比方案的複雜度與維護成本。
+
+4. **Risk & Edge Cases**:
+   - 預測潛在的 Side Effects。
+   - 考慮邊界條件（如：空值、網路延遲、效能瓶頸）。
+
+5. **Confirmation Loop**:
+   - 在執行大規模改動前，必須摘要上述分析並徵詢核准。
+
+
+<output_format>
+
+請用以下結構回應：
+
+1. 問題定義（Problem）
+   - 明確說明目前要解決的問題
+   - 指出涉及的模組或檔案
+
+2. 解法選項（Options）
+   - 最多提供三種解法(沒有可以不提供)
+   - 每個方案需簡述做法
+
+3. 推薦方案（Recommendation）
+   - 明確選出最佳方案
+   - 說明選擇理由（如：可維護性 / 與現有架構相容 / 複雜度）
+
+4. 風險（Risk）
+   - 指出可能的問題或副作用
+   - 若有 trade-off 必須說明
+
+若資訊不足，需補充：
+
+5. 問題（Question）
+   - 明確指出需要確認的資訊
+</output_format>
