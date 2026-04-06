@@ -3,7 +3,13 @@ import type {
   ExtendedComponentInstance,
   WatchEffects,
 } from "../types/vue-internals";
-import { collectSetupState, bindSetupTrack, resolveDepNode, resolveDepName } from "./tracker";
+import {
+  collectSetupState,
+  collectPiniaState,
+  bindSetupTrack,
+  resolveDepNode,
+  resolveDepName,
+} from "./tracker";
 import { GraphNode, updateGraph, getGraph, notifyUpdate } from "../graph";
 
 // WeakMap：避免把 __node reference 直接掛在 Vue 物件上造成循環引用
@@ -160,12 +166,12 @@ export function collectInstance(
   // 子組件重用
   const count = componentKeyCountMap.get(baseComponentName) ?? 0;
   componentKeyCountMap.set(baseComponentName, count + 1);
-  const componentName = count === 0 ? baseComponentName : `${baseComponentName}_${count}`;
+  const componentName =
+    count === 0 ? baseComponentName : `${baseComponentName}_${count}`;
 
   const nodes: GraphNode[] = [];
 
   const rawSetupState = instance.setupState?.["__v_raw"] || {};
-
   const parentRawSetupState = instance.parent?.setupState?.["__v_raw"];
   // instance.propsOptions = [props定義物件, Vue內部轉型列表]，取 [0] 遍歷所有 prop 名稱
   const propsOptions = instance.propsOptions?.[0];
@@ -185,7 +191,9 @@ export function collectInstance(
       ? instanceChildPropKeyMap.get(instance.parent)
       : undefined;
 
-    const typeData = parentChildPropMap?.get(instance.type as unknown as object);
+    const typeData = parentChildPropMap?.get(
+      instance.type as unknown as object,
+    );
     const siblingIndex = typeData?.nextIndex ?? 0;
     if (typeData) typeData.nextIndex++;
 
@@ -278,14 +286,29 @@ export function collectInstance(
     }
   }
 
+  const pinia = instance.appContext.app.config.globalProperties.$pinia;
+  collectPiniaState(pinia, nodes, valNodeMap);
+
+  const storeComputedKeySet = new Set<string>();
+  for (const key in rawSetupState) {
+    const val = rawSetupState[key];
+    if (!(typeof val === "object" && val !== null)) continue;
+    if (!(val as any)?.$id) continue;
+    const raw = (val as any).__v_raw ?? val;
+    for (const k in raw) {
+      if ((raw[k] as any)?.effect) storeComputedKeySet.add(k);
+    }
+  }
+
   if (rawSetupState) {
     collectSetupState({
       rawSetupState,
-      componentName,
+      namespace: componentName,
       file,
       nodes,
       valNodeMap,
       skipKeys: injectKeySet,
+      storeComputedKeySet,
     });
   }
 
@@ -379,7 +402,10 @@ export function collectInstance(
     instance.setupState = savedSetupState;
 
     if (dryRunVNode) {
-      const childPropMap = new Map<object, { maps: Map<string, string>[]; nextIndex: number }>();
+      const childPropMap = new Map<
+        object,
+        { maps: Map<string, string>[]; nextIndex: number }
+      >();
       traverseVNodeForSentinels(
         dryRunVNode,
         sentinelToKey,
@@ -430,7 +456,8 @@ export function triggerInstance(
     : file;
   const count = componentKeyCountMap.get(baseComponentName) ?? 0;
   componentKeyCountMap.set(baseComponentName, count + 1);
-  const componentName = count === 0 ? baseComponentName : `${baseComponentName}_${count}`;
+  const componentName =
+    count === 0 ? baseComponentName : `${baseComponentName}_${count}`;
 
   const rawSetupState = instance.setupState?.["__v_raw"] || {};
   const nodes = getGraph()[componentName] ?? [];
@@ -470,7 +497,11 @@ export function triggerInstance(
       if (!watchNode) return;
 
       effect.onTrack = (event: DebuggerEvent) => {
-        const depName = resolveDepName(event.target as object, event.key, propKeyNodeMap);
+        const depName = resolveDepName(
+          event.target as object,
+          event.key,
+          propKeyNodeMap,
+        );
         if (!depName) return;
 
         if (!watchNode.deps.includes(depName)) {

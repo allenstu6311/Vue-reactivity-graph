@@ -6,6 +6,13 @@ import type {
   Data,
 } from "../types/vue-internals";
 
+function forceComputedEval(val: ComputedRefImpl): void {
+  val.flags |= 1 << 4;
+  val.flags &= ~(1 << 7);
+  val.globalVersion = -1;
+  val.value;
+}
+
 function isPiniaStore(val: unknown): boolean {
   if (
     typeof (val as any)?.$id === "string" &&
@@ -20,13 +27,13 @@ function isPiniaStore(val: unknown): boolean {
 function buildNode(
   key: string,
   val: ComputedRefImpl | any,
-  componentName: string,
+  namespace: string,
   file: string,
 ): GraphNode | null {
-  const id = `${componentName}.${key}`;
+  const id = `${namespace}.${key}`;
 
   //val.fn 是 Vue 3.5 ComputedRefImpl 的內部 getter，未公開 API，用來識別 computed
-  if (val?.fn) {
+  if (val?.effect) {
     return {
       id,
       varName: key,
@@ -36,10 +43,6 @@ function buildNode(
       deps: [],
       subs: [],
     };
-  }
-
-  if (isPiniaStore(val)) {
-    return { id, varName: key, type: "store", val, file, deps: [], subs: [] };
   }
 
   //val.dep 是 Vue 3.5 Ref 內部的 Dep class 實例，用來識別 ref
@@ -83,38 +86,92 @@ function buildNode(
 
 interface CollectSetupStateParams {
   rawSetupState: Data;
-  componentName: string;
+  namespace: string;
   file: string;
   nodes: GraphNode[];
   valNodeMap: WeakMap<object, GraphNode>;
   skipKeys?: Set<string>;
+  storeComputedKeySet?: Set<string>;
 }
 
 // Phase 1: 建 node、存 valNodeMap
 export function collectSetupState({
   rawSetupState,
-  componentName,
+  namespace,
   file,
   nodes,
   valNodeMap,
   skipKeys,
+  storeComputedKeySet,
 }: CollectSetupStateParams): void {
-  // console.log("rawSetupState", rawSetupState);
   for (const key in rawSetupState) {
     if (key === "props") continue;
     if (skipKeys?.has(key)) continue;
     const val = rawSetupState[key];
-    if (typeof val !== "object" || val === null) continue;
 
+    if (typeof val !== "object" || val === null) continue;
+    if (isPiniaStore(val)) continue;
+    if (valNodeMap.has(val)) continue;
+
+    // storeToRefs wrapper computed：mini-trigger 識別對應的 store node，不建新節點
+    if ((val as any)?.effect && storeComputedKeySet?.has(key)) {
+      let foundStoreNode: GraphNode | undefined;
+      const savedOnTrack = (val as any).onTrack;
+
+      (val as any).onTrack = (event: TrackEvent) => {
+        const node = valNodeMap.get(event.target as object);
+        if (node?.type === "store") foundStoreNode = node;
+      };
+      forceComputedEval(val as unknown as ComputedRefImpl);
+      (val as any).onTrack = savedOnTrack;
+      if (foundStoreNode) {
+        val.__vrg_depKey = `${foundStoreNode.id}`;
+        valNodeMap.set(val, foundStoreNode);
+        continue;
+      }
+    }
+
+    
     //onTrack 只拿得到 event.target（響應式物件本身），無法直接得知變數名
     // 直接將 key 掛在物件上，讓 onTrack 能取得對應的 varName
     val.__vrg_depKey = key;
-    const node = buildNode(key, val, componentName, file);
+
+
+    const node = buildNode(key, val, namespace, file);
     if (node) {
       valNodeMap.set(val, node);
       nodes.push(node);
     }
   }
+}
+
+export function collectPiniaState(
+  pinia: any,
+  nodes: GraphNode[],
+  valNodeMap: WeakMap<object, GraphNode>,
+): void {
+  if (!pinia?._s) return;
+  pinia._s.forEach((store: any) => {
+    const storeId: string = store.$id;
+    const raw = store.__v_raw ?? store;
+    for (const key in raw) {
+      if (key.startsWith("$") || key.startsWith("_")) continue;
+      const val = raw[key];
+      if (typeof val !== "object" || val === null) continue;
+      val.__vrg_depKey = `${storeId}.${key}`;
+      const node: GraphNode = {
+        id: `${storeId}.${key}`,
+        varName: key,
+        type: "store",
+        val,
+        file: storeId,
+        deps: [],
+        subs: [],
+      };
+      valNodeMap.set(val, node);
+      nodes.push(node);
+    }
+  });
 }
 
 export function resolveDepName(
@@ -132,19 +189,25 @@ export function resolveDepName(
 export function resolveDepNode(
   target: object,
   key: string | symbol,
-  depName: string,
-  rawSetupState: RawSetupState,
+  depName: string | undefined,
+  rawSetupState: object | undefined,
   valNodeMap: WeakMap<object, GraphNode>,
   propKeyNodeMap: WeakMap<object, Map<string, GraphNode>>,
   injectRawToLocalNode: Map<object, GraphNode>,
 ): GraphNode | undefined {
+  const stateVal =
+    depName && rawSetupState
+      ? (rawSetupState as Record<string, unknown>)[depName]
+      : undefined;
   return (
     // target 是當前 component 的 inject 值；per-component 區域 Map，不污染全域 valNodeMap
     injectRawToLocalNode.get(target) ||
-    // target 就是響應式物件本身（ref / reactive / computed）
+    // target 就是響應式物件本身（ref / reactive / computed / pinia store 內部值）
     valNodeMap.get(target) ||
-    // target 是 Pinia store state proxy，不在 valNodeMap，改用 depName 從 setupState 取出原始值再查
-    valNodeMap.get(rawSetupState[depName] as object) ||
+    // Pinia store fallback：target 是 rawStore，改用 rawSetupState[depName] 查 valNodeMap
+    (stateVal && typeof stateVal === "object"
+      ? valNodeMap.get(stateVal as object)
+      : undefined) ||
     // target 是 raw props object；prop 值可能是 primitive 無法當 WeakMap key，所以另開兩層結構
     propKeyNodeMap.get(target)?.get(String(key))
   );
@@ -166,17 +229,23 @@ export function bindSetupTrack({
   propKeyNodeMap,
   injectRawToLocalNode,
 }: BindSetupTrackParams): void {
-
   for (const key in rawSetupState) {
     const val = rawSetupState[key];
 
     if (val?.fn) {
+      const subNode = valNodeMap.get(val as object);
+      if (!subNode || subNode.type === "store") continue;
+
       val.onTrack = (event: TrackEvent) => {
         const subNode = valNodeMap.get(val as object)!;
+        if (!subNode) return;
 
-        const depName = resolveDepName(event.target as object, event.key, propKeyNodeMap);
+        const depName = resolveDepName(
+          event.target as object,
+          event.key,
+          propKeyNodeMap,
+        );
         if (!depName) return;
-        if (!subNode.deps.includes(depName)) subNode.deps.push(depName);
 
         const depNode = resolveDepNode(
           event.target as object,
@@ -187,25 +256,26 @@ export function bindSetupTrack({
           propKeyNodeMap,
           injectRawToLocalNode,
         );
-        if (depNode) {
-          // prop / inject 的 subscriber 跨 component 查找時需要完整 ID
-          const subName =
-            depNode.type === "prop" || depNode.type === "inject"
-              ? `${componentName}.${key}`
-              : key;
-          if (!depNode.subs.includes(subName)) depNode.subs.push(subName);
-        }
 
+        if (depNode) {
+          if (!subNode.deps.includes(depName)) subNode.deps.push(depName);
+
+          // prop / inject 的 subscriber 跨 component 查找時需要完整 ID
+          if (depNode.type === "prop" || depNode.type === "inject") {
+            const subName =
+              depNode.type === "prop" || depNode.type === "inject"
+                ? `${componentName}.${key}`
+                : key;
+            if (!depNode.subs.includes(subName)) depNode.subs.push(subName);
+          } else {
+            if (!depNode.subs.includes(subNode.id))
+              depNode.subs.push(subNode.id);
+          }
+        }
         notifyUpdate();
       };
 
-      //強制 computed 重新計算以觸發 onTrack
-      // bit 4 (DIRTY) = 標記為髒值需重算，bit 7 (SSR_RENDER) 清除避免干擾
-      // globalVersion = -1 確保版本號過期，讓 Vue 認為此 computed 需要重新求值
-      val.flags |= 1 << 4;
-      val.flags &= ~(1 << 7);
-      val.globalVersion = -1;
-      val.value;
+      forceComputedEval(val);
     }
   }
 }
