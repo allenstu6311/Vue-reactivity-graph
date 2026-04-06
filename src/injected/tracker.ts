@@ -186,15 +186,25 @@ export function resolveDepName(
   );
 }
 
-export function resolveDepNode(
-  target: object,
-  key: string | symbol,
-  depName: string | undefined,
-  rawSetupState: object | undefined,
-  valNodeMap: WeakMap<object, GraphNode>,
-  propKeyNodeMap: WeakMap<object, Map<string, GraphNode>>,
-  injectRawToLocalNode: Map<object, GraphNode>,
-): GraphNode | undefined {
+interface ResolveDepNodeParams {
+  target: object;
+  key: string | symbol;
+  depName: string | undefined;
+  rawSetupState: object | undefined;
+  valNodeMap: WeakMap<object, GraphNode>;
+  propKeyNodeMap: WeakMap<object, Map<string, GraphNode>>;
+  injectRawToLocalNode: Map<object, GraphNode>;
+}
+
+export function resolveDepNode({
+  target,
+  key,
+  depName,
+  rawSetupState,
+  valNodeMap,
+  propKeyNodeMap,
+  injectRawToLocalNode,
+}: ResolveDepNodeParams): GraphNode | undefined {
   const stateVal =
     depName && rawSetupState
       ? (rawSetupState as Record<string, unknown>)[depName]
@@ -247,15 +257,15 @@ export function bindSetupTrack({
         );
         if (!depName) return;
 
-        const depNode = resolveDepNode(
-          event.target as object,
-          event.key,
+        const depNode = resolveDepNode({
+          target: event.target as object,
+          key: event.key,
           depName,
           rawSetupState,
           valNodeMap,
           propKeyNodeMap,
           injectRawToLocalNode,
-        );
+        });
 
         if (depNode) {
           if (!subNode.deps.includes(depName)) subNode.deps.push(depName);

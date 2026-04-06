@@ -508,15 +508,15 @@ export function triggerInstance(
           watchNode.deps.push(depName);
         }
 
-        const depNode = resolveDepNode(
-          event.target as object,
-          event.key,
+        const depNode = resolveDepNode({
+          target: event.target as object,
+          key: event.key,
           depName,
           rawSetupState,
           valNodeMap,
           propKeyNodeMap,
           injectRawToLocalNode,
-        );
+        });
 
         if (depNode && !depNode.subs.includes(watchShortName)) {
           depNode.subs.push(watchShortName);
