@@ -496,6 +496,8 @@ export function triggerInstance(
       );
       if (!watchNode) return;
 
+      const watchFullId = `${componentName}.${watchShortName}`;
+
       effect.onTrack = (event: DebuggerEvent) => {
         const depName = resolveDepName(
           event.target as object,
@@ -503,10 +505,6 @@ export function triggerInstance(
           propKeyNodeMap,
         );
         if (!depName) return;
-
-        if (!watchNode.deps.includes(depName)) {
-          watchNode.deps.push(depName);
-        }
 
         const depNode = resolveDepNode({
           target: event.target as object,
@@ -518,8 +516,9 @@ export function triggerInstance(
           injectRawToLocalNode,
         });
 
-        if (depNode && !depNode.subs.includes(watchShortName)) {
-          depNode.subs.push(watchShortName);
+        if (depNode) {
+          if (!watchNode.deps.includes(depNode.id)) watchNode.deps.push(depNode.id);
+          if (!depNode.subs.includes(watchFullId)) depNode.subs.push(watchFullId);
         }
 
         notifyUpdate();

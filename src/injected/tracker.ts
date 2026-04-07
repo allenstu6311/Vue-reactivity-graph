@@ -268,7 +268,7 @@ export function bindSetupTrack({
         });
 
         if (depNode) {
-          if (!subNode.deps.includes(depName)) subNode.deps.push(depName);
+          if (!subNode.deps.includes(depNode.id)) subNode.deps.push(depNode.id);
 
           // prop / inject 的 subscriber 跨 component 查找時需要完整 ID
           if (depNode.type === "prop" || depNode.type === "inject") {
