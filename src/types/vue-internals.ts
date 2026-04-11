@@ -31,6 +31,7 @@ export type TrackerDebuggerEvent = DebuggerEvent & {
 // Vue 內部 ComputedRefImpl（未公開 export）
 export interface ComputedRefImpl {
   fn?: () => unknown
+  effect?: object
   onTrack?: (event: TrackEvent) => void
   flags: number
   globalVersion: number
