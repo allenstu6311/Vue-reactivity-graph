@@ -13,15 +13,18 @@ function forceComputedEval(val: ComputedRefImpl): void {
   val.value;
 }
 
-function isPiniaStore(val: unknown): boolean {
-  if (
+function isPiniaStoreProxy(val: unknown): boolean {
+  return (
     typeof (val as any)?.$id === "string" &&
     typeof (val as any)?.$patch === "function"
-  )
-    return true;
-  if ((val as any)?._key !== undefined && isPiniaStore((val as any)?._object))
-    return true;
-  return false;
+  );
+}
+
+// storeToRefs 產生的 ObjectRefImpl：_key 是屬性名，_object 是 store proxy
+export function isStoreToRefsRef(val: unknown): boolean {
+  return (
+    (val as any)?._key !== undefined && isPiniaStoreProxy((val as any)?._object)
+  );
 }
 
 function buildNode(
@@ -46,7 +49,7 @@ function buildNode(
   }
 
   //val.dep 是 Vue 3.5 Ref 內部的 Dep class 實例，用來識別 ref
-  if (val?.dep) {
+  if (val?.__v_isRef) {
     return { id, varName: key, type: "ref", val, file, deps: [], subs: [] };
   }
 
@@ -81,6 +84,8 @@ function buildNode(
     };
   }
 
+  console.log("val", val);
+
   return null;
 }
 
@@ -92,6 +97,7 @@ interface CollectSetupStateParams {
   valNodeMap: WeakMap<object, GraphNode>;
   skipKeys?: Set<string>;
   storeComputedKeySet?: Set<string>;
+  storeValToComponentNode: Map<object, GraphNode>;
 }
 
 // Phase 1: 建 node、存 valNodeMap
@@ -103,6 +109,7 @@ export function collectSetupState({
   valNodeMap,
   skipKeys,
   storeComputedKeySet,
+  storeValToComponentNode,
 }: CollectSetupStateParams): void {
   for (const key in rawSetupState) {
     if (key === "props") continue;
@@ -110,32 +117,57 @@ export function collectSetupState({
     const val = rawSetupState[key];
 
     if (typeof val !== "object" || val === null) continue;
-    if (isPiniaStore(val)) continue;
+    if (isPiniaStoreProxy(val)) continue;
     if (valNodeMap.has(val)) continue;
 
-    // storeToRefs wrapper computed：mini-trigger 識別對應的 store node，不建新節點
-    if ((val as any)?.effect && storeComputedKeySet?.has(key)) {
-      let foundStoreNode: GraphNode | undefined;
-      const savedOnTrack = (val as any).onTrack;
+    // storeToRefs ref/reactive wrapper（ObjectRefImpl）
+    // _object 是 store proxy，_key 是屬性名，透過這兩個靜態建立 component node 與 store node 的連結
+    if (isStoreToRefsRef(val)) {
+      console.log("isStoreToRefsRef", val);
+      const storeRaw = (val as any)._object?.__v_raw ?? (val as any)._object;
+      const storeKey = (val as any)._key;
+      const storeVal = storeRaw?.[storeKey];
+      const storeNode =
+        storeVal && typeof storeVal === "object"
+          ? valNodeMap.get(storeVal as object)
+          : undefined;
 
-      (val as any).onTrack = (event: TrackEvent) => {
-        const node = valNodeMap.get(event.target as object);
-        if (node?.type === "store") foundStoreNode = node;
-      };
-      forceComputedEval(val as unknown as ComputedRefImpl);
-      (val as any).onTrack = savedOnTrack;
-      if (foundStoreNode) {
-        val.__vrg_depKey = `${foundStoreNode.id}`;
-        valNodeMap.set(val, foundStoreNode);
-        continue;
+      val.__vrg_depKey = key;
+      const componentNode = buildNode(key, val, namespace, file);
+      if (componentNode && storeNode) {
+        componentNode.deps.push(storeNode.id);
+        if (!storeNode.subs.includes(componentNode.id))
+          storeNode.subs.push(componentNode.id);
+        storeValToComponentNode.set(storeVal as object, componentNode);
+        valNodeMap.set(val, componentNode);
+        nodes.push(componentNode);
       }
+      continue;
     }
 
-    
+    // TODO: storeToRefs wrapper computed（getter）
+    // storeToRefs 的 computed getter 產生全新的 wrapper ComputedRefImpl，與 ref/reactive 的 ObjectRefImpl 不同
+    // 需要 mini-trigger（forceComputedEval + 暫時覆蓋 onTrack）才能找到對應的 store computed node
+    // 目前暫時跳過，待後續實作時應建立 component node 並連結至 store node（同 ref/reactive 的處理方式）
+    // if ((val as any)?.effect && storeComputedKeySet?.has(key)) {
+    //   let foundStoreNode: GraphNode | undefined;
+    //   const savedOnTrack = (val as any).onTrack;
+    //   (val as any).onTrack = (event: TrackEvent) => {
+    //     const node = valNodeMap.get(event.target as object);
+    //     if (node?.type === "store") foundStoreNode = node;
+    //   };
+    //   forceComputedEval(val as unknown as ComputedRefImpl);
+    //   (val as any).onTrack = savedOnTrack;
+    //   if (foundStoreNode) {
+    //     val.__vrg_depKey = `${foundStoreNode.id}`;
+    //     valNodeMap.set(val, foundStoreNode);
+    //     continue;
+    //   }
+    // }
+
     //onTrack 只拿得到 event.target（響應式物件本身），無法直接得知變數名
     // 直接將 key 掛在物件上，讓 onTrack 能取得對應的 varName
     val.__vrg_depKey = key;
-
 
     const node = buildNode(key, val, namespace, file);
     if (node) {
@@ -180,7 +212,7 @@ export function resolveDepName(
   propKeyNodeMap: WeakMap<object, Map<string, GraphNode>>,
 ): string | undefined {
   return (
-    (isPiniaStore(target) ? String(key) : undefined) ??
+    (isPiniaStoreProxy(target) ? String(key) : undefined) ??
     (target as any).__vrg_depKey ??
     (propKeyNodeMap.has(target) ? String(key) : undefined)
   );
@@ -194,6 +226,7 @@ interface ResolveDepNodeParams {
   valNodeMap: WeakMap<object, GraphNode>;
   propKeyNodeMap: WeakMap<object, Map<string, GraphNode>>;
   injectRawToLocalNode: Map<object, GraphNode>;
+  storeValToComponentNode?: Map<object, GraphNode>;
 }
 
 export function resolveDepNode({
@@ -204,12 +237,16 @@ export function resolveDepNode({
   valNodeMap,
   propKeyNodeMap,
   injectRawToLocalNode,
+  storeValToComponentNode,
 }: ResolveDepNodeParams): GraphNode | undefined {
   const stateVal =
     depName && rawSetupState
       ? (rawSetupState as Record<string, unknown>)[depName]
       : undefined;
+
   return (
+    // storeToRefs ref/reactive wrapper：store 底層值 → component node（優先於 valNodeMap 的 store node）
+    storeValToComponentNode?.get(target) ||
     // target 是當前 component 的 inject 值；per-component 區域 Map，不污染全域 valNodeMap
     injectRawToLocalNode.get(target) ||
     // target 就是響應式物件本身（ref / reactive / computed / pinia store 內部值）
@@ -229,6 +266,7 @@ interface BindSetupTrackParams {
   valNodeMap: WeakMap<object, GraphNode>;
   propKeyNodeMap: WeakMap<object, Map<string, GraphNode>>;
   injectRawToLocalNode: Map<object, GraphNode>;
+  storeValToComponentNode: Map<object, GraphNode>;
 }
 
 // Phase 2: 設 onTrack + 觸發 computed
@@ -238,17 +276,22 @@ export function bindSetupTrack({
   valNodeMap,
   propKeyNodeMap,
   injectRawToLocalNode,
+  storeValToComponentNode,
 }: BindSetupTrackParams): void {
   for (const key in rawSetupState) {
     const val = rawSetupState[key];
 
-    if (val?.fn) {
+    if (val?.effect) {
       const subNode = valNodeMap.get(val as object);
       if (!subNode || subNode.type === "store") continue;
 
       val.onTrack = (event: TrackEvent) => {
         const subNode = valNodeMap.get(val as object)!;
         if (!subNode) return;
+
+        // storeToRefs wrapper computed 執行時會先存取 storeProxy 再存取 internal computed
+        // storeProxy 本身不是我們追蹤的節點，直接跳過，避免 stateVal 反查到自己
+        if (isPiniaStoreProxy(event.target as object)) return;
 
         const depName = resolveDepName(
           event.target as object,
@@ -265,23 +308,21 @@ export function bindSetupTrack({
           valNodeMap,
           propKeyNodeMap,
           injectRawToLocalNode,
+          storeValToComponentNode,
         });
 
-        if (depNode) {
-          if (!subNode.deps.includes(depNode.id)) subNode.deps.push(depNode.id);
+        // depNode.id === subNode.id：storeToRefs wrapper 自我追蹤的防護
+        if (!depNode || depNode.id === subNode.id) return;
 
-          // prop / inject 的 subscriber 跨 component 查找時需要完整 ID
-          if (depNode.type === "prop" || depNode.type === "inject") {
-            const subName =
-              depNode.type === "prop" || depNode.type === "inject"
-                ? `${componentName}.${key}`
-                : key;
-            if (!depNode.subs.includes(subName)) depNode.subs.push(subName);
-          } else {
-            if (!depNode.subs.includes(subNode.id))
-              depNode.subs.push(subNode.id);
-          }
-        }
+        if (!subNode.deps.includes(depNode.id)) subNode.deps.push(depNode.id);
+
+        // prop / inject 的 subs 需要完整的 component-scoped ID 才能跨 component 查找
+        // 一般節點用 subNode.id（已含 componentName 前綴），不用 key（只是短名稱）
+        const isPropOrInject =
+          depNode.type === "prop" || depNode.type === "inject";
+        const subName = isPropOrInject ? `${componentName}.${key}` : subNode.id;
+
+        if (!depNode.subs.includes(subName)) depNode.subs.push(subName);
         notifyUpdate();
       };
 

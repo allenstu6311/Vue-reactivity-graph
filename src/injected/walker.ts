@@ -9,6 +9,7 @@ import {
   bindSetupTrack,
   resolveDepNode,
   resolveDepName,
+  isStoreToRefsRef,
 } from "./tracker";
 import { GraphNode, updateGraph, getGraph, notifyUpdate } from "../graph";
 
@@ -289,6 +290,10 @@ export function collectInstance(
   const pinia = instance.appContext.app.config.globalProperties.$pinia;
   collectPiniaState(pinia, nodes, valNodeMap);
 
+  // per-component：store 底層值 → component node（storeToRefs ref/reactive）
+  // 與 injectRawToLocalNode 同理，每個 component 獨立建立，避免兄弟 component 互蓋
+  const storeValToComponentNode = new Map<object, GraphNode>();
+
   const storeComputedKeySet = new Set<string>();
   for (const key in rawSetupState) {
     const val = rawSetupState[key];
@@ -309,6 +314,7 @@ export function collectInstance(
       valNodeMap,
       skipKeys: injectKeySet,
       storeComputedKeySet,
+      storeValToComponentNode,
     });
   }
 
@@ -474,6 +480,22 @@ export function triggerInstance(
     }
   }
 
+  // per-component：重建 store 底層值 → component node 的對應（storeToRefs ref/reactive）
+  // Phase 1 已將 ObjectRefImpl 建成 component node 並存入 valNodeMap
+  // 此處透過 rawSetupState 重新取得 storeVal，還原 storeVal → componentNode 的查找
+  const storeValToComponentNode = new Map<object, GraphNode>();
+  for (const key in rawSetupState) {
+    const val = rawSetupState[key];
+    if (!val || typeof val !== "object") continue;
+    if (!isStoreToRefsRef(val)) continue;
+    const storeRaw = (val as any)._object?.__v_raw ?? (val as any)._object;
+    const storeVal = storeRaw?.[(val as any)._key];
+    const componentNode = valNodeMap.get(val as object);
+    if (storeVal && typeof storeVal === "object" && componentNode) {
+      storeValToComponentNode.set(storeVal as object, componentNode);
+    }
+  }
+
   if (rawSetupState) {
     bindSetupTrack({
       rawSetupState,
@@ -481,6 +503,7 @@ export function triggerInstance(
       valNodeMap,
       propKeyNodeMap,
       injectRawToLocalNode,
+      storeValToComponentNode,
     });
   }
 
@@ -514,6 +537,7 @@ export function triggerInstance(
           valNodeMap,
           propKeyNodeMap,
           injectRawToLocalNode,
+          storeValToComponentNode,
         });
 
         if (depNode) {
