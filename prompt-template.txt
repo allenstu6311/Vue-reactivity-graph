@@ -1,3 +1,29 @@
+<output_format>
+
+請用以下結構回應：
+
+1. 問題定義（Problem）
+   - 明確說明目前要解決的問題
+   - 指出涉及的模組或檔案
+
+2. 解法選項（Options）
+   - 最多提供三種解法(沒有可以不提供)
+   - 每個方案需簡述做法
+
+3. 推薦方案（Recommendation）
+   - 明確選出最佳方案
+   - 說明選擇理由（如：可維護性 / 與現有架構相容 / 複雜度）
+
+4. 風險（Risk）
+   - 指出可能的問題或副作用
+   - 若有 trade-off 必須說明
+
+若資訊不足，需補充：
+
+5. 問題（Question）
+   - 明確指出需要確認的資訊
+</output_format>
+
 1. 任務類型：[Bugfix / Feature / Refactor]
 2. 需求描述：
 (例如：讓 Provide/Inject 能支援跨多層 Component 的追蹤)
