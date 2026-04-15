@@ -341,34 +341,38 @@ export function collectInstance(
 
   // Sentinel dry-run：對每個 setupState key 回傳唯一 symbol
   // 捕捉 dry-run VNode，從子元件 props 中的 sentinel 直接建立 propName → parentKey 對應
-  if ((instance as any).render && Object.keys(rawSetupState).length > 0) {
+  if ((instance as any).render && (Object.keys(rawSetupState).length > 0 || !!propsOptions)) {
     //withProxy 是給 runtime-compiled 模板（with block）使用的 proxy，有不同的 has trap
     // 讓 with(ctx){...} 的屬性查找能正確運作，沒有時 fallback 到一般 proxy
     const proxyToUse = (instance as any).withProxy ?? (instance as any).proxy;
     const sentinelToKey = new Map<symbol, string>();
+
+    const propsSentinelProxy = propsOptions
+      ? new Proxy(instance.props as object, {
+          get(target, key, receiver) {
+            //  <AboutView :aboutData="text" />
+            if (
+              typeof key === "string" &&
+              !key.startsWith("__v_") &&
+              key in propsOptions
+            ) {
+              const s = Symbol(`props.${key}`);
+              sentinelToKey.set(s, `props.${key}`);
+              return s;
+            }
+            return Reflect.get(target, key, receiver);
+          },
+        })
+      : instance.props;
+
     //sentinel proxy 讓每個 setupState key 回傳唯一 Symbol 代替真實值
     // render 執行後，VNode props 中出現的 Symbol 就能直接對應回父層的 key 名
     // 不需要比對 value（primitive 值會碰撞），每個 Symbol 天生唯一
-    const sentinelProxy = new Proxy(instance.setupState as object, {
+    const sentinelProxy = new Proxy((instance.setupState ?? {}) as object, {
       get(target, key, receiver) {
         if (typeof key === "string" && !key.startsWith("__v_")) {
-          // props 是物件，需要遞迴攔截 .xxx 的存取
-          if (key === "props" && instance.props) {
-            return new Proxy(instance.props as object, {
-              get(_, propKey) {
-                if (
-                  typeof propKey === "string" &&
-                  !propKey.startsWith("__v_")
-                ) {
-                  const s = Symbol(`props.${propKey}`);
-                  sentinelToKey.set(s, `props.${propKey}`);
-                  return s;
-                }
-                return Reflect.get(instance.props as object, propKey);
-              },
-            });
-          }
-
+          //  <AboutView :aboutData="props.text" />
+          if (key === "props" && instance.props) return propsSentinelProxy;
           const s = Symbol(key);
           sentinelToKey.set(s, key);
           return s;
@@ -376,6 +380,9 @@ export function collectInstance(
         return Reflect.get(target, key, receiver);
       },
     });
+
+    const savedProps = instance.props;
+    instance.props = propsSentinelProxy as any;
 
     //暫時替換 instance.setupState 讓 render 存取 sentinel proxy
     // 結束後必須還原，否則會破壞 Vue 的響應式系統
@@ -405,7 +412,9 @@ export function collectInstance(
       console.warn = origWarn;
     }
 
+    // 復原Vue狀態避免不可預期的行為
     instance.setupState = savedSetupState;
+    instance.props = savedProps;
 
     if (dryRunVNode) {
       const childPropMap = new Map<
@@ -495,7 +504,6 @@ export function triggerInstance(
       storeValToComponentNode.set(storeVal as object, componentNode);
     }
   }
-
   if (rawSetupState) {
     bindSetupTrack({
       rawSetupState,
@@ -541,8 +549,10 @@ export function triggerInstance(
         });
 
         if (depNode) {
-          if (!watchNode.deps.includes(depNode.id)) watchNode.deps.push(depNode.id);
-          if (!depNode.subs.includes(watchFullId)) depNode.subs.push(watchFullId);
+          if (!watchNode.deps.includes(depNode.id))
+            watchNode.deps.push(depNode.id);
+          if (!depNode.subs.includes(watchFullId))
+            depNode.subs.push(watchFullId);
         }
 
         notifyUpdate();
