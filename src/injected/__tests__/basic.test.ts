@@ -48,7 +48,7 @@ describe('Phase 1 — 單一元件基礎驗證', () => {
       varName: 'count',
       type: 'ref',
       deps: [],
-      subs: ['double', 'w_0'],
+      subs: ['TestComp.double', 'TestComp.w_0'],
     })
 
     // reactive: items
@@ -57,7 +57,7 @@ describe('Phase 1 — 單一元件基礎驗證', () => {
       varName: 'items',
       type: 'reactive',
       deps: [],
-      subs: ['listLen'],
+      subs: ['TestComp.listLen'],
     })
 
     // computed: double（讀 ref）
@@ -65,8 +65,8 @@ describe('Phase 1 — 單一元件基礎驗證', () => {
       id: 'TestComp.double',
       varName: 'double',
       type: 'computed',
-      deps: ['count'],
-      subs: ['label', 'w_1'],
+      deps: ['TestComp.count'],
+      subs: ['TestComp.label', 'TestComp.w_1'],
     })
 
     // computed: label（讀 computed — chain）
@@ -74,7 +74,7 @@ describe('Phase 1 — 單一元件基礎驗證', () => {
       id: 'TestComp.label',
       varName: 'label',
       type: 'computed',
-      deps: ['double'],
+      deps: ['TestComp.double'],
       subs: [],
     })
 
@@ -83,7 +83,7 @@ describe('Phase 1 — 單一元件基礎驗證', () => {
       id: 'TestComp.listLen',
       varName: 'listLen',
       type: 'computed',
-      deps: ['items'],
+      deps: ['TestComp.items'],
       subs: [],
     })
 
@@ -92,7 +92,7 @@ describe('Phase 1 — 單一元件基礎驗證', () => {
       id: 'TestComp.w_0',
       varName: 'w_0',
       type: 'watch',
-      deps: ['count'],
+      deps: ['TestComp.count'],
       subs: [],
     })
 
@@ -101,7 +101,7 @@ describe('Phase 1 — 單一元件基礎驗證', () => {
       id: 'TestComp.w_1',
       varName: 'w_1',
       type: 'watch',
-      deps: ['double'],
+      deps: ['TestComp.double'],
       subs: [],
     })
   })
@@ -120,8 +120,8 @@ describe('Phase 1 — 單一元件基礎驗證', () => {
     const graph = runWalker(DupComp)
     const sumTwice = graph['DupComp'].find(n => n.varName === 'sumTwice')!
 
-    expect(sumTwice.deps).toStrictEqual(['count'])
-    expect(graph['DupComp'].find(n => n.varName === 'count')!.subs).toStrictEqual(['sumTwice'])
+    expect(sumTwice.deps).toStrictEqual(['DupComp.count'])
+    expect(graph['DupComp'].find(n => n.varName === 'count')!.subs).toStrictEqual(['DupComp.sumTwice'])
   })
 
   it('無訂閱者的 ref，subs 為空陣列', () => {

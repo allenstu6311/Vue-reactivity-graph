@@ -32,10 +32,11 @@ function clearGraph(): void {
  * 流程與 injected/index.ts 一致：
  *   resetComponentKeyCounts → collectInstance → resetComponentKeyCounts → triggerInstance
  */
-export function runWalker(rootComponent: any): ComponentGraph {
+export function runWalker(rootComponent: any, plugins: any[] = []): ComponentGraph {
   clearGraph()
 
   const app = createNullApp(rootComponent)
+  for (const plugin of plugins) app.use(plugin)
   const container = {} as any
   app.mount(container)
 
