@@ -1,4 +1,10 @@
-import { collectInstance, triggerInstance, setHmrOverride, deleteHmrOverride, resetComponentKeyCounts } from "./walker";
+import {
+  collectInstance,
+  triggerInstance,
+  setHmrOverride,
+  deleteHmrOverride,
+  resetComponentKeyCounts,
+} from "./walker";
 import type { ExtendedComponentInstance } from "../types/vue-internals";
 import { getGraph, setOnUpdate } from "../graph";
 import type { NodeType } from "../graph";
@@ -44,13 +50,13 @@ if (app) {
         comp,
         nodes.map((n) => ({
           ...n,
-          val: sanitizeVal(n.val, n.type),
+          // val: sanitizeVal(n.val, n.type),
+          val: "", // 暫時不顯示資料
         })),
       ]),
     );
-  
+
     (window as unknown as Record<string, unknown>).__vueReactivityGraph = plain;
-      // console.log('plain', plain)
     window.postMessage({ type: "VUE_GRAPH_UPDATE" }, "*");
   }
 

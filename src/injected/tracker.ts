@@ -83,9 +83,6 @@ function buildNode(
       subs: [],
     };
   }
-
-  console.log("val", val);
-
   return null;
 }
 
@@ -123,7 +120,6 @@ export function collectSetupState({
     // storeToRefs ref/reactive wrapper（ObjectRefImpl）
     // _object 是 store proxy，_key 是屬性名，透過這兩個靜態建立 component node 與 store node 的連結
     if (isStoreToRefsRef(val)) {
-      console.log("isStoreToRefsRef", val);
       const storeRaw = (val as any)._object?.__v_raw ?? (val as any)._object;
       const storeKey = (val as any)._key;
       const storeVal = storeRaw?.[storeKey];

@@ -4,7 +4,6 @@ chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== 'devtools-panel') return
   panelPorts.add(port)
   port.onDisconnect.addListener(() => {
-    console.log('[background] panel disconnected')
     panelPorts.delete(port)
   })
 })
