@@ -117,6 +117,14 @@ Vue App（頁面）
 - 不可假設未提供的資訊
 - 不可跳過分析直接給最終答案
 
+## Agent 使用規則
+
+- **需求分析前**：使用者描述新功能、Bug 修復、重構需求 → 必須先呼叫 `spec-writer` agent
+- **props 相關**：涉及 prop 傳遞、sentinel dry-run、`propKeyNodeMap`、prop 來源追蹤 → 呼叫 `vue-props-expert`
+- **setup state 相關**：涉及 `valNodeMap`、`collectSetupState`、ref/reactive/computed 識別 → 呼叫 `vue-setup-state-expert`
+- **inject 相關**：涉及 `injectRawToNodeMap`、`resolveDepNode` inject 路徑、provide/inject 追蹤 → 呼叫 `vue-inject-expert`
+- **Pinia 相關**：涉及 `storeToRefs`、Pinia store 追蹤、dep 結構 → 呼叫 `vue-pinia-expert`
+
 ## Thought Process Protocol
 
 1. **Context Mapping**: 
