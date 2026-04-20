@@ -170,11 +170,10 @@ describe('Phase 3 — Props 基礎傳遞', () => {
     })
   })
 
-  // ── 已知限制：Prop → Prop 轉傳 ──────────────────────────────────────────
+  // ── Prop → Prop 轉傳 ──────────────────────────────────────────────────
   // GrandParent(ref) → Parent(prop) → Child(prop)
-  // 第二層 prop→prop 預期失敗：Parent 的 count 在 instance.props，不在 setupState，
-  // sentinel dry-run 的 getOwnPropertyDescriptor fallthrough 讓 sentinel 攔不到
-  it('prop → prop 轉傳：第二層 prop node 無法連回父層 prop（已知限制）', () => {
+  // sentinel dry-run 會遍歷 instance.props，能追蹤 prop→prop 的依賴鏈
+  it('prop → prop 轉傳：第二層 prop node 可連回父層 prop', () => {
     const PropChild = defineComponent({
       name: 'PropChild',
       props: { value: Number },
@@ -200,9 +199,8 @@ describe('Phase 3 — Props 基礎傳遞', () => {
     const parentCount = graph['PropGrandParent.PropParent']?.find(n => n.varName === 'count')!
     expect(parentCount.deps).toStrictEqual(['PropGrandParent.count'])
 
-    // 第二層（prop → prop）：PropParent.count 在 instance.props，不在 setupState
-    // hasOwnProperty(sentinelProxy, 'count') = false → component proxy fallthrough 到真實 props
-    // sentinel 攔不到 → childValue.deps 實際為 []，以下斷言會失敗
+    // 第二層（prop → prop）：PropParent.count 在 instance.props
+    // sentinel dry-run 同樣覆蓋 props，能追蹤 PropParent.count → PropChild.value ✓
     const childValue = graph['PropGrandParent.PropParent.PropChild']?.find(n => n.varName === 'value')!
     expect(pick(childValue)).toStrictEqual({
       id: 'PropGrandParent.PropParent.PropChild.value',
