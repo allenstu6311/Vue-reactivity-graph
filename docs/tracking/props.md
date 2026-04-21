@@ -51,8 +51,26 @@ render 函數透過兩條路存取 setupState：
 
 ---
 
+## Strategy 3：v-bind 整包展開（Branch A）
+
+當模板寫 `<HomeView v-bind="someObj" />` 時，Vue compiler 直接把 `_ctx.someObj` 當成整個 `props` 傳入，dry-run 後 `vnode.props` 本身就是一個 sentinel Symbol（`Symbol(someObj)`），無法 `Object.entries`，Strategy 1 / Strategy 2 均失效。
+
+**解法：rawSetupState 反查表**
+
+1. 偵測到 `typeof vnode.props === 'symbol' && sentinelToKey.has(vnode.props)` → `sourceKey = 'someObj'`
+2. 建立反查表：遍歷 `rawSetupState`（排除 `sourceKey` 自身），`value → varName`
+3. `rawSourceObj = sourceVal.__v_raw ?? sourceVal`（繞過 reactive proxy 取底層 plain object）
+4. 對每個 `innerKey`：`reverseMap.get(rawSourceObj[innerKey])` 取得 `sourceVarName`
+5. `propMap.set(innerKey, sourceVarName)`（格式與 Strategy 2 相同，子層解析邏輯零修改）
+
+**關鍵前提**：`toRaw(reactive({ text: num })).text === num`（RefImpl 本身），`rawSetupState` 也直接儲存 RefImpl，兩者是同一個物件引用，反查可命中。
+
+找不到來源時 `console.warn` 並靜默跳過（例如 `someObj` 內含 primitive value）。
+
+---
+
 ## 已知瓶頸
 
-- **sentinel dry-run 失敗**：部分 component 的 render 函數在 dry-run 時回傳非 VNode（如 Symbol），導致 `traverseVNodeForSentinels` 直接 return，Strategy 2 對該 component 失效，只能靠 Strategy 1 補救。
 - **Prop → prop 的 sentinel**：只有 `$props.xxx` 的存取路徑能被 `propsSentinelProxy` 攔截，若 render 函數透過 `_ctx.xxx` 存取 prop（不同編譯模式），sentinel 無法捕捉。
-- **`v-bind="someObj"` 無法追蹤**：當整個 props 物件以 `v-bind` 展開傳入時，sentinel dry-run 無法識別個別 prop 的來源響應式變數，Strategy 1 / Strategy 2 均失效。
+- **`v-bind="someObj"` 巢狀結構**：Strategy 3 只處理一層展開，若 `someObj` 的 value 是另一個 reactive 物件，不遞迴追蹤。
+- **多個 `v-bind` 展開**：`<Child v-bind="a" v-bind="b" />` 時 Vue 以 `mergeProps` 合併，`vnode.props` 是合併後物件而非 Symbol，Strategy 3 不觸發，改由 Strategy 2 處理（各 key 的值仍是 sentinel Symbol）。

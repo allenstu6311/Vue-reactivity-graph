@@ -93,13 +93,42 @@ function traverseVNodeForSentinels(
     }
     if (resolvedType && typeof resolvedType === "object") {
       const propMap = new Map<string, string>();
-      for (const [propName, val] of Object.entries(
-        vnode.props as Record<string, unknown>,
-      )) {
-        if (typeof val === "symbol" && sentinelToKey.has(val)) {
-          propMap.set(propName, sentinelToKey.get(val)!);
+
+      if (typeof vnode.props === "symbol" && sentinelToKey.has(vnode.props)) {
+        // Branch A：v-bind="someObj" 整包展開，vnode.props 本身是 sentinel Symbol
+        const sourceKey = sentinelToKey.get(vnode.props)!;
+
+        const reverseMap = new Map<unknown, string>();
+        for (const [k, v] of Object.entries(rawSetupState as Record<string, unknown>)) {
+          if (k !== sourceKey) reverseMap.set(v, k);
+        }
+
+        const sourceVal = (rawSetupState as any)[sourceKey];
+        const rawSourceObj = (sourceVal?.__v_raw ?? sourceVal) as Record<string, unknown> | null;
+        if (rawSourceObj && typeof rawSourceObj === "object") {
+          for (const innerKey of Object.keys(rawSourceObj)) {
+            const innerVal = rawSourceObj[innerKey];
+            const sourceVarName = reverseMap.get(innerVal);
+            if (sourceVarName !== undefined) {
+              propMap.set(innerKey, sourceVarName);
+            } else {
+              console.warn(
+                `v-bind展開追蹤：無法在 rawSetupState 中找到 "${sourceKey}.${innerKey}" 的來源變數，該 prop 將不會被追蹤。`,
+              );
+            }
+          }
+        }
+      } else {
+        // Branch B：逐一比對每個 prop 值是否為 sentinel Symbol
+        for (const [propName, val] of Object.entries(
+          vnode.props as Record<string, unknown>,
+        )) {
+          if (typeof val === "symbol" && sentinelToKey.has(val)) {
+            propMap.set(propName, sentinelToKey.get(val)!);
+          }
         }
       }
+
       if (propMap.size > 0) {
         const existing = result.get(resolvedType as object);
         if (existing) {
@@ -195,6 +224,7 @@ export function collectInstance(
     const typeData = parentChildPropMap?.get(
       instance.type as unknown as object,
     );
+
     const siblingIndex = typeData?.nextIndex ?? 0;
     if (typeData) typeData.nextIndex++;
 

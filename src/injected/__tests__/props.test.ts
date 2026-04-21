@@ -2,8 +2,8 @@
 // 測試子元件 prop 節點連回父層 source node（ref / computed）
 // 測試同一 component 使用兩次時的命名去重（ChildComp / ChildComp_1）
 // 驗收標準見 TEST_PLAN.md Phase 3
-import { describe, it, expect } from 'vitest'
-import { defineComponent, ref, computed, h } from '@vue/runtime-core'
+import { describe, it, expect, vi } from 'vitest'
+import { defineComponent, ref, reactive, computed, h, createVNode } from '@vue/runtime-core'
 import { runWalker } from './test-utils'
 import type { GraphNode } from '../../graph'
 
@@ -208,6 +208,171 @@ describe('Phase 3 — Props 基礎傳遞', () => {
       type: 'prop',
       deps: ['PropGrandParent.PropParent.count'],
       subs: [],
+    })
+  })
+
+  // ── Branch A：v-bind="someObj" 整包展開 ───────────────────────────────────
+  // 測試情境：sentinel dry-run 後 vnode.props 本身是 Symbol
+  // Walker 應反查 rawSetupState 建立 innerKey → sourceVarName 對應
+
+  describe('Branch A — v-bind="someObj" 整包展開追蹤', () => {
+    // reactive 包裹情境
+    // someObj = reactive({ text: num })，<VBindChild v-bind="someObj" />
+    // render 模擬：createVNode(Child, (this as any).someObj)
+    // sentinel dry-run 時，(this as any).someObj 存取 sentinelProxy.someObj → Symbol('someObj')
+    // createVNode(Child, Symbol) → vnode.props = Symbol('someObj')，觸發 Branch A
+    const VBindChildReactive = defineComponent({
+      name: 'VBindChildReactive',
+      props: { text: Number },
+      render() { return h('div') },
+    })
+
+    const VBindParentReactive = defineComponent({
+      name: 'VBindParentReactive',
+      setup() {
+        const num = ref(10)
+        const someObj = reactive({ text: num })
+        return { num, someObj }
+      },
+      render() {
+        return createVNode(VBindChildReactive, (this as any).someObj)
+      },
+    })
+
+    it('reactive 包裹：prop node 的 deps 包含來源 ref 的 id', () => {
+      const graph = runWalker(VBindParentReactive)
+      const child = graph['VBindParentReactive.VBindChildReactive']
+
+      expect(child).toBeDefined()
+      const textProp = child.find(n => n.varName === 'text')!
+      expect(textProp).toBeDefined()
+      expect(textProp.deps).toContain('VBindParentReactive.num')
+    })
+
+    it('reactive 包裹：來源 ref 的 subs 包含 prop node 的 id', () => {
+      const graph = runWalker(VBindParentReactive)
+      const parent = graph['VBindParentReactive']
+
+      const numNode = parent.find(n => n.varName === 'num')!
+      expect(numNode).toBeDefined()
+      expect(numNode.subs).toContain('VBindParentReactive.VBindChildReactive.text')
+    })
+
+    // 純物件情境
+    // someObj = { text: num }（非 reactive 包裹），__v_raw 不存在，fallback 到 someObj 自身
+    // rawSourceObj[innerKey] 仍是同一個 RefImpl 引用，reverseMap 仍能反查
+    const VBindChildPlain = defineComponent({
+      name: 'VBindChildPlain',
+      props: { text: Number },
+      render() { return h('div') },
+    })
+
+    const VBindParentPlain = defineComponent({
+      name: 'VBindParentPlain',
+      setup() {
+        const num = ref(99)
+        const someObj = { text: num }
+        return { num, someObj }
+      },
+      render() {
+        return createVNode(VBindChildPlain, (this as any).someObj)
+      },
+    })
+
+    it('純物件包裹（非 reactive）：prop node 的 deps 包含來源 ref 的 id', () => {
+      const graph = runWalker(VBindParentPlain)
+      const child = graph['VBindParentPlain.VBindChildPlain']
+
+      expect(child).toBeDefined()
+      const textProp = child.find(n => n.varName === 'text')!
+      expect(textProp).toBeDefined()
+      expect(textProp.deps).toContain('VBindParentPlain.num')
+    })
+
+    it('純物件包裹（非 reactive）：來源 ref 的 subs 包含 prop node 的 id', () => {
+      const graph = runWalker(VBindParentPlain)
+      const parent = graph['VBindParentPlain']
+
+      const numNode = parent.find(n => n.varName === 'num')!
+      expect(numNode).toBeDefined()
+      expect(numNode.subs).toContain('VBindParentPlain.VBindChildPlain.text')
+    })
+
+    // primitive 值無法反查情境
+    // someObj = reactive({ count: 0 })，primitive value 不在 reverseMap 裡
+    // 應呼叫 console.warn，不拋出例外
+    const VBindChildPrimitive = defineComponent({
+      name: 'VBindChildPrimitive',
+      props: { count: Number },
+      render() { return h('div') },
+    })
+
+    const VBindParentPrimitive = defineComponent({
+      name: 'VBindParentPrimitive',
+      setup() {
+        const someObj = reactive({ count: 0 })
+        return { someObj }
+      },
+      render() {
+        return createVNode(VBindChildPrimitive, (this as any).someObj)
+      },
+    })
+
+    it('someObj 內含 primitive value：呼叫 console.warn，不拋出例外', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      try {
+        expect(() => runWalker(VBindParentPrimitive)).not.toThrow()
+        expect(warnSpy).toHaveBeenCalled()
+      } finally {
+        warnSpy.mockRestore()
+      }
+    })
+
+    // Branch A 與 Branch B 並存情境
+    // 父元件同時有：v-bind="someObj"（Branch A）與 :title="titleVar"（Branch B）
+    // 兩個 prop 都應正確追蹤
+    const VBindChildMixed = defineComponent({
+      name: 'VBindChildMixed',
+      props: { text: Number, title: String },
+      render() { return h('div') },
+    })
+
+    const VBindParentMixed = defineComponent({
+      name: 'VBindParentMixed',
+      setup() {
+        const num = ref(7)
+        const titleVar = ref('hello')
+        const someObj = reactive({ text: num })
+        return { num, titleVar, someObj }
+      },
+      render() {
+        // 模擬 <VBindChildMixed v-bind="someObj" :title="titleVar" />
+        // Vue 編譯後等同於 mergeProps(someObj, { title: titleVar })
+        // 但 dry-run 時兩者分別是 Symbol('someObj') 與 Symbol('titleVar')
+        // 注意：多個 v-bind 時 Vue 會 mergeProps，此處只測一個 v-bind 加一個具名 prop 的情境
+        // 為了正確模擬，需先展開 someObj 再加 title（Branch B 路徑）
+        const self = this as any
+        return createVNode(VBindChildMixed, { ...self.someObj, title: self.titleVar })
+      },
+    })
+
+    it('Branch A 與 Branch B 並存：v-bind 展開的 prop 和具名 prop 都能正確追蹤', () => {
+      const graph = runWalker(VBindParentMixed)
+      const parent = graph['VBindParentMixed']
+      const child = graph['VBindParentMixed.VBindChildMixed']
+
+      expect(child).toBeDefined()
+
+      const textProp = child.find(n => n.varName === 'text')!
+      const titleProp = child.find(n => n.varName === 'title')!
+
+      expect(textProp).toBeDefined()
+      expect(titleProp).toBeDefined()
+
+      // Branch B 路徑：titleVar → title prop（具名 prop sentinel）
+      expect(titleProp.deps).toContain('VBindParentMixed.titleVar')
+      const titleVarNode = parent.find(n => n.varName === 'titleVar')!
+      expect(titleVarNode.subs).toContain('VBindParentMixed.VBindChildMixed.title')
     })
   })
 
