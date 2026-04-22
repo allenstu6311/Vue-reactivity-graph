@@ -3,13 +3,15 @@
 步驟：
 1. 執行 `git rev-parse --abbrev-ref HEAD` 取得當前分支名稱
 2. 執行 `git log master..HEAD --oneline` 取得 commit 清單
-3. 執行 `git diff master...HEAD` 取得完整差異
+3. 執行 `git diff master` 取得完整差異（包含已 commit 與未 commit 的變更，一律納入分析）
 4. 分析差異內容，將所有發現依下列等級分類：
    - **CRITICAL**：會導致功能錯誤、資料遺失、安全漏洞、或破壞性 API 變更
    - **HIGH**：潛在 bug、效能嚴重下降、缺少必要的錯誤處理
    - **MEDIUM**：code quality 問題、不符合專案慣例、缺少型別標注
    - **LOW**：命名建議、可讀性改善、冗餘代碼
 5. 將報告寫入根目錄 `merge-report.md`（若已存在直接覆蓋）
+
+##### 備註: 未 commit 的變更同樣納入差異分析與問題分類；但在「Commit 清單」與「變更檔案總覽」區塊中，只列出已 commit 的部分，未 commit 的檔案另外用「未 commit 變更」小節補充
 
 報告格式：
 ```

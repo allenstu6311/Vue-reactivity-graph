@@ -35,3 +35,19 @@ injectRawToLocalNode.get(target)          // inject（per-component，優先）
   ?? valNodeMap.get(rawSetupState[depName]) // Pinia store fallback
   ?? propKeyNodeMap.get(target)?.get(key) // props（target 是 rawPropsObj）
 ```
+
+---
+
+## 已知瓶頸
+
+- **provide primitive（string / number / boolean）**：`typeof val !== "object"` 守衛同時過濾 provide 側與 child 側，inject node 不建立。使用者可改用 `ref()` 包裝來繞過。
+
+- **inject default value，provide 不存在**：`parentProvides` 沒有此 key，`provideRawToNode` 建不到，inject node 不建立。此情境設計上就沒有 provide 來源，圖中無來源節點屬預期行為。
+
+- **inject 封裝在 composable，原始值不暴露到 setupState**：`rawSetupState` 找不到 inject 值，inject node 不建立。此限制連 Vue DevTools 也無法處理，因為 inject 值從未出現在任何 component 的公開 state 中。
+
+- **root component inject app.provide**：`instance.parent === null`，整段 inject 偵測邏輯被跳過。root component 直接 inject 屬極少見情境。
+
+- **provide 匿名建立的 ref**：`provide('key', ref(42))` 中的 ref 不在任何 component 的 `setupState`，`valNodeMap` 無此 entry，provide → inject 鏈斷裂。
+
+- **inject 後立即解構 reactive**：`const { foo } = inject('config')` 解構出 primitive，不在 `parentProvides` 範圍，比對失敗。reactive 解構後失去響應性，本身是 Vue 不推薦的寫法。

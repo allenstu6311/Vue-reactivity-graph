@@ -281,10 +281,18 @@ export function collectInstance(
   if (parentProvides) {
     // 先建 raw → parentNode 的 lookup，避免雙層 for...in
     const provideRawToNode = new Map<object, GraphNode>();
-    for (const key in parentProvides) {
-      const val = (parentProvides as Record<string, unknown>)[key];
+    const provideKeys: (string | symbol)[] = [
+      ...Object.keys(parentProvides as object),
+      ...Object.getOwnPropertySymbols(parentProvides as object),
+    ];
+    for (const key of provideKeys) {
+      const val = (parentProvides as any)[key];
       if (typeof val !== "object" || val === null) continue;
-      const parentNode = valNodeMap.get(val as object);
+      // readonly(ref) 等包裝：__v_raw 指向原始物件，valNodeMap key 是原始物件
+      const raw = (val as any).__v_raw;
+      const parentNode =
+        (raw && typeof raw === "object" ? valNodeMap.get(raw as object) : undefined) ??
+        valNodeMap.get(val as object);
       if (parentNode) provideRawToNode.set(val as object, parentNode);
     }
 
