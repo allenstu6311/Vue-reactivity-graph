@@ -283,7 +283,7 @@ export function collectInstance(
     const provideRawToNode = new Map<object, GraphNode>();
     const provideKeys: (string | symbol)[] = [
       ...Object.keys(parentProvides as object),
-      ...Object.getOwnPropertySymbols(parentProvides as object),
+      ...Object.getOwnPropertySymbols(parentProvides as object), // Vue 官方建議用 Symbol 作為 provide key 以避免命名衝突
     ];
     for (const key of provideKeys) {
       const val = (parentProvides as any)[key];
