@@ -1,4 +1,5 @@
-// Phase 5 — 極端情境
-// 測試 props 再傳 props（grandparent → parent → child）
-// 測試 inject 值當 prop 傳入子元件
-// 驗收標準見 TEST_PLAN.md Phase 5（待補）
+// 邊界條件測試
+// 測試 inject 無對應 provider 時使用預設值（inject node 建立但 deps 為空）
+// 測試 provide computed ref（inject node 的 deps 應指向 computed node）
+// 測試鏈式 re-provide（A provide → B inject 後再 provide → C inject，injectRawToNodeMap 不被覆蓋）
+// 驗收標準待補
