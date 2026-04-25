@@ -5,7 +5,7 @@
 // 測試 Pinia storeToRefs ref 作為 prop source（Pinia → prop）
 // 驗收標準見 spec.md
 import { describe, it, expect } from 'vitest'
-import { defineComponent, ref, computed, provide, inject, h } from '@vue/runtime-core'
+import { defineComponent, ref, computed, provide, inject, h } from 'vue'
 import { defineStore, storeToRefs, createPinia } from 'pinia'
 import { runWalker } from './test-utils'
 import type { GraphNode } from '../../graph'

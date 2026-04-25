@@ -4,7 +4,7 @@
 // 測試 inject 值被 computed 讀取時的 deps / subs 連線（跨元件完整 id）
 // 驗收標準見 TEST_PLAN.md Phase 4
 import { describe, it, expect } from 'vitest'
-import { defineComponent, ref, reactive, provide, inject, computed, watch, readonly, h } from '@vue/runtime-core'
+import { defineComponent, ref, reactive, provide, inject, computed, watch, readonly, h } from 'vue'
 import { runWalker } from './test-utils'
 import type { GraphNode } from '../../graph'
 

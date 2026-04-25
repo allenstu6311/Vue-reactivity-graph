@@ -287,7 +287,7 @@ export function bindSetupTrack({
 
         // storeToRefs wrapper computed 執行時會先存取 storeProxy 再存取 internal computed
         // storeProxy 本身不是我們追蹤的節點，直接跳過，避免 stateVal 反查到自己
-        if (isPiniaStoreProxy(event.target as object)) return;
+        // if (isPiniaStoreProxy(event.target as object)) return;
 
         const depName = resolveDepName(
           event.target as object,

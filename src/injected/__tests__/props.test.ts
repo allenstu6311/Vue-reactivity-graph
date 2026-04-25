@@ -3,7 +3,7 @@
 // 測試同一 component 使用兩次時的命名去重（ChildComp / ChildComp_1）
 // 驗收標準見 TEST_PLAN.md Phase 3
 import { describe, it, expect, vi } from 'vitest'
-import { defineComponent, ref, reactive, computed, h, createVNode } from '@vue/runtime-core'
+import { defineComponent, ref, reactive, computed, h, createVNode } from 'vue'
 import { runWalker } from './test-utils'
 import type { GraphNode } from '../../graph'
 

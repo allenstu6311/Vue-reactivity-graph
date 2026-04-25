@@ -2,10 +2,7 @@
 // 測試 ref / reactive / computed / watch 節點建立與 deps / subs 連線
 // 驗收標準見 TEST_PLAN.md Phase 1
 import { describe, it, expect } from 'vitest'
-// Must import from @vue/runtime-core (not 'vue') to share the same module instance
-// as the null renderer in test-utils.ts — otherwise currentInstance state won't propagate
-// and watch effects won't register in instance.scope.effects
-import { defineComponent, ref, reactive, computed, watch, h } from '@vue/runtime-core'
+import { defineComponent, ref, reactive, computed, watch, h } from 'vue'
 import { runWalker } from './test-utils'
 import type { GraphNode } from '../../graph'
 

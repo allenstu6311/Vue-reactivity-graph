@@ -1,8 +1,8 @@
-// 測試元件的 ref/reactive/computed/watch 必須從 '@vue/runtime-core' 匯入，不得從 'vue'。
-// 原因：createRenderer 建立的 null renderer 與 @vue/runtime-core 共用同一個 module instance；
-// 若從 'vue'（@vue/runtime-dom）匯入，Node.js ESM 會載入獨立的 module instance，
-// watch effect 看不到 renderer 設定的 currentInstance，導致 watch 節點不被 walker 偵測（silent bug）。
-import { createRenderer } from '@vue/runtime-core'
+// 所有測試檔必須統一從 'vue' 匯入，不得使用 '@vue/runtime-core'。
+// 原因：Pinia 內部使用 'vue'；若測試元件或 createRenderer 改用 '@vue/runtime-core'，
+// 兩者成為獨立的 module instance，各自的 activeEffect / currentInstance 全域變數不共享，
+// 導致 storeToRefs ObjectRefImpl 的 onTrack 無法觸發，watch 節點也無法被偵測。
+import { createRenderer } from 'vue'
 import type { ExtendedComponentInstance } from '../../types/vue-internals'
 import { resetComponentKeyCounts, collectInstance, triggerInstance } from '../walker'
 import { getGraph } from '../../graph'
