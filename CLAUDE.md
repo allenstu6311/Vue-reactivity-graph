@@ -38,22 +38,6 @@
 
 整體結構為 `ComponentGraph = Record<string, GraphNode[]>`，key 為 component 名稱。
 
-``
-const COMPS = {
-  cart: [
-    { id: 'cart.price',        type: 'ref',      val: '99',           file: 'CartPanel.vue', subs: ['total', 'discounted'] },
-    { id: 'cart.qty',          type: 'ref',      val: '3',            file: 'CartPanel.vue', subs: ['total', 'itemLabel'] },
-    { id: 'cart.coupon',       type: 'ref',      val: '"SAVE10"',     file: 'CartPanel.vue', subs: ['discounted'] },
-    { id: 'cart.cart',         type: 'reactive', val: '{items,note}', file: 'CartPanel.vue', subs: ['itemLabel', 'isEmpty', 'w_cart_total'] },
-    { id: 'cart.total',        type: 'computed', val: '297',          file: 'CartPanel.vue', deps: ['price', 'qty'],        subs: ['w_cart_total'] },
-    { id: 'cart.discounted',   type: 'computed', val: '267',          file: 'CartPanel.vue', deps: ['price', 'coupon'] },
-    { id: 'cart.itemLabel',    type: 'computed', val: '"3 items"',    file: 'CartPanel.vue', deps: ['qty', 'cart'] },
-    { id: 'cart.isEmpty',      type: 'computed', val: 'false',        file: 'useCart.js',    deps: ['cart'] },
-    { id: 'cart.w_cart_total', type: 'watch',    val: '—',            file: 'CartPanel.vue', deps: ['cart', 'total'] },
-  ],
-}
-``
-
 ---
 
 ## 檔案地圖
@@ -78,25 +62,6 @@ const COMPS = {
 
 ---
 
-## 整體資料流
-
-```
-Vue App（頁面）
-  └─ injected/index.ts        取 _instance → 呼叫 walker/tracker → 結果存 window.__vueReactivityGraph
-       ↓ window.postMessage('VUE_GRAPH_UPDATE')
-  content/index.ts            轉發給 background
-       ↓ chrome.runtime.sendMessage
-  background/index.ts         廣播給所有已連線的 panel
-       ↓ port.postMessage
-  panel/App.vue               接收更新，傳資料給子元件
-    ├─ composables/useLayout.ts    dagre 佈局 + upstream/downstream BFS
-    ├─ components/GraphView.vue    vue-flow 渲染節點與邊
-    ├─ components/GraphNode.vue    單一節點外觀
-    └─ components/VariableList.vue 左側變數清單
-```
-
----
-
 ## 命名慣例
 
 - `__vrg_` 前綴為本插件（Vue Reactivity Graph）專用，直接掛在 Vue 響應式物件上的屬性都使用此前綴
@@ -107,6 +72,12 @@ Vue App（頁面）
 ## 啟動指令
 
 請在每次對話開始時讀取 `ARCHITECTURE.md`與 `DESIGN_NOTES.md`。
+
+涉及 tracking 子系統時，讀取對應的 `docs/tracking/` 文件：
+- `docs/tracking/setup-state.md`：ref / reactive / computed 識別與 valNodeMap
+- `docs/tracking/inject.md`：provide / inject 追蹤、injectRawToNodeMap、shared reference
+- `docs/tracking/props.md`：prop 來源追蹤、sentinel dry-run、propKeyNodeMap
+- `docs/tracking/pinia.md`：storeToRefs ref / reactive / computed wrapper 追蹤行為
 
 ---
 
@@ -126,22 +97,3 @@ Vue App（頁面）
 - **inject 相關**：涉及 `injectRawToNodeMap`、`resolveDepNode` inject 路徑、provide/inject 追蹤 → 呼叫 `vue-inject-expert`
 - **Pinia 相關**：涉及 `storeToRefs`、Pinia store 追蹤、dep 結構 → 呼叫 `vue-pinia-expert`
 
-## Thought Process Protocol
-
-1. **Context Mapping**: 
-   - 優先研讀 `ARCHITECTURE.md` 建立全域觀。
-   - 識別本次任務涉及的核心組件與設計模式。
-
-2. **Impact Analysis (Data & Logic Flow)**:
-   - 追蹤資料從進入點到儲存/輸出的路徑。
-   - 標註受影響的 API、Types、以及 Test Suites。
-
-3. **Solution Architecture**:
-   - 對比方案的複雜度與維護成本。
-
-4. **Risk & Edge Cases**:
-   - 預測潛在的 Side Effects。
-   - 考慮邊界條件（如：空值、網路延遲、效能瓶頸）。
-
-5. **Confirmation Loop**:
-   - 在執行大規模改動前，必須摘要上述分析並徵詢核准。

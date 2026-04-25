@@ -21,11 +21,13 @@ const data1 = computed(() => `${doubleCount.value} items`)
 
 ---
 
-## ref / reactive（ObjectRefImpl）
+## ref（ObjectRefImpl）
 
-`storeToRefs` 將 state 包成 ObjectRefImpl，getter = `() => store[key]`，沒有自己的 dep。
+`storeToRefs` 將 ref state 包成 `ObjectRefImpl(_object = rawStore, key)`。
 
-**追蹤行為**：`data1` 讀 `count.value` 時，getter 執行，Vue 為 `data1` 產生兩次 onTrack：
+`ObjectRefImpl.get value()` 執行：`rawStore[key]` → 取得 RefImpl → `unref(RefImpl)` → 觸發 `trackRefValue(RefImpl)` → **onTrack 觸發，target = 內部 RefImpl**。
+
+**追蹤行為**：`data1` 讀 `count.value` 時，Vue 為 `data1` 產生兩次 onTrack：
 
 ```
 data1 讀 count.value
@@ -42,6 +44,23 @@ data1 讀 count.value
 同時將 `store 內部 RefImpl → App.count` 存入 `storeValToComponentNode`。Phase 2 onTrack #2 查這張 map 優先於 `valNodeMap`，正確返回 `App.count` 而非 `counter.count`。
 
 最終鏈：`data1 → App.count → counter.count`
+
+---
+
+## reactive（ObjectRefImpl）
+
+`storeToRefs` 將 reactive state 同樣包成 `ObjectRefImpl(_object = rawStore, key)`。
+
+`ObjectRefImpl` constructor 中，因為 `_object = rawStore`（plain object，非 proxy），`isProxy(rawStore) = false` → `_shallow = true`。
+
+`ObjectRefImpl.get value()` 執行：`rawStore[key]` → 取得 reactive proxy → `unref(reactiveProxy)` → reactive proxy 沒有 `__v_isRef` → **直接 return，不觸發 trackRefValue** → **onTrack 不觸發**。
+
+**追蹤行為**：`data1` 讀 `items.value` 時，沒有 onTrack。subs 追蹤依賴 Phase 1 靜態建立：
+- `App.items.deps = ['counter.items']`（`isStoreToRefsRef` 路徑，與 ref 相同）
+- subs 連結（`counter.items → App.items`，`App.items → data1`）**不經過 onTrack**，需要其他機制
+
+最終鏈（Phase 1 靜態部分）：`App.items → counter.items`（已建立）  
+`data1 → App.items`：onTrack 不觸發，**目前無法自動建立**
 
 ---
 
