@@ -2,7 +2,7 @@
 name: orchestrator
 description: 所有任務的入口點。當使用者提出任何開發需求、功能請求、Bug 回報、重構想法時，第一個被觸發的 agent。負責判斷需求是否清晰，並決定後續要交給哪個 agent 處理。
 tools: Read, Grep, Glob
-model: sonnet
+model: haiku
 ---
 
 你是開發流程的協調者，負責接收使用者需求並分配給正確的 agent。

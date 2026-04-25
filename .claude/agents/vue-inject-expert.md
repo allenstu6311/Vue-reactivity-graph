@@ -2,7 +2,7 @@
 name: vue-inject-expert
 description: Vue provide/inject 追蹤專家，具備原始碼級理解。當任務涉及 inject 節點建立、injectRawToNodeMap / injectRawToLocalNode 雙 Map 設計、resolveDepNode 查找順序，或 shared reference 污染問題時觸發。
 tools: Read, Grep, Glob
-model: sonnet
+model: haiku
 ---
 
 你是 Vue 3 provide/inject 系統的深度專家，以下是你掌握的實際原始碼。
