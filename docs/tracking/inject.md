@@ -22,6 +22,12 @@ A.num (RefImpl)
   - 深度優先遍歷保證父層先寫，子層 prop 連結時查得到
   - 刻意不寫入 `valNodeMap`，避免兄弟 component 互蓋
 
+- **Anonymous node（provide 值不在 setupState）**
+  - 當 `valNodeMap` 找不到 provided value 時（如 `provide('key', ref(42))` inline，ref 未被賦值到任何變數），在父層 graph entry 建一個節點
+  - `id: ${parentName}.anonymous:${key}`，`varName: 'anonymous'`，`type: 'ref' | 'reactive'`
+  - 建立後寫入 `valNodeMap`，兄弟 component inject 同一個 key 時直接命中，不重建
+  - 後續子層 inject 偵測正常連線，`deps` 指向此 anonymous node
+
 - **Phase 2：`injectRawToLocalNode`（per-component local Map）**
   - 每次 `triggerInstance` 重建，只包含當前 component 的 inject nodes
   - `resolveDepNode` 優先查這個 Map，命中即返回正確節點
@@ -47,7 +53,5 @@ injectRawToLocalNode.get(target)          // inject（per-component，優先）
 - **inject 封裝在 composable，原始值不暴露到 setupState**：`rawSetupState` 找不到 inject 值，inject node 不建立。此限制連 Vue DevTools 也無法處理，因為 inject 值從未出現在任何 component 的公開 state 中。
 
 - **root component inject app.provide**：`instance.parent === null`，整段 inject 偵測邏輯被跳過。root component 直接 inject 屬極少見情境。
-
-- **provide 匿名建立的 ref**：`provide('key', ref(42))` 中的 ref 不在任何 component 的 `setupState`，`valNodeMap` 無此 entry，provide → inject 鏈斷裂。
 
 - **inject 後立即解構 reactive**：`const { foo } = inject('config')` 解構出 primitive，不在 `parentProvides` 範圍，比對失敗。reactive 解構後失去響應性，本身是 Vue 不推薦的寫法。
