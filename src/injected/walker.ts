@@ -278,6 +278,7 @@ export function collectInstance(
   // 必須在 collectSetupState 之前，避免 inject 來的 ref/reactive 被誤建成一般 node
   const injectKeySet = new Set<string>();
   const parentProvides = instance.parent?.provides;
+
   if (parentProvides) {
     // 先建 raw → parentNode 的 lookup，避免雙層 for...in
     const provideRawToNode = new Map<object, GraphNode>();
@@ -285,15 +286,38 @@ export function collectInstance(
       ...Object.keys(parentProvides as object),
       ...Object.getOwnPropertySymbols(parentProvides as object), // Vue 官方建議用 Symbol 作為 provide key 以避免命名衝突
     ];
+    const parentFile =
+      ((instance.parent?.type as any)?.__name as string) ||
+      ((instance.parent?.type as any)?.name as string) ||
+      "Anonymous";
     for (const key of provideKeys) {
       const val = (parentProvides as any)[key];
       if (typeof val !== "object" || val === null) continue;
-      // readonly(ref) 等包裝：__v_raw 指向原始物件，valNodeMap key 是原始物件
       const raw = (val as any).__v_raw;
-      const parentNode =
+      const lookupKey = (raw && typeof raw === "object" ? raw : val) as object;
+      let parentNode =
         (raw && typeof raw === "object" ? valNodeMap.get(raw as object) : undefined) ??
         valNodeMap.get(val as object);
-      if (parentNode) provideRawToNode.set(val as object, parentNode);
+
+      if (!parentNode) {
+        const keyStr =
+          typeof key === "symbol"
+            ? `anonymous:${key.description ?? "symbol"}`
+            : `anonymous:${String(key)}`;
+        parentNode = {
+          id: `${prevComponentName}.${keyStr}`,
+          varName: "anonymous",
+          type: (val as any).__v_isRef ? "ref" : "reactive",
+          val: lookupKey,
+          file: parentFile,
+          deps: [],
+          subs: [],
+        };
+        getGraph()[prevComponentName!]?.push(parentNode);
+        valNodeMap.set(lookupKey, parentNode);
+      }
+
+      provideRawToNode.set(val as object, parentNode);
     }
 
     if (provideRawToNode.size > 0) {

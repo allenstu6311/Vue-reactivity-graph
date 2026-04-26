@@ -35,7 +35,6 @@ function buildNode(
 ): GraphNode | null {
   const id = `${namespace}.${key}`;
 
-  //val.fn 是 Vue 3.5 ComputedRefImpl 的內部 getter，未公開 API，用來識別 computed
   if (val?.effect) {
     return {
       id,
@@ -48,7 +47,6 @@ function buildNode(
     };
   }
 
-  //val.dep 是 Vue 3.5 Ref 內部的 Dep class 實例，用來識別 ref
   if (val?.__v_isRef) {
     return { id, varName: key, type: "ref", val, file, deps: [], subs: [] };
   }

@@ -11,7 +11,6 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/injected/__tests__/**/*.test.ts'],
-    exclude: ['**/edge-cases.test.ts'],
   },
   publicDir: 'public',
   build: {
