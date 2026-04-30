@@ -1,7 +1,8 @@
 import type { DebuggerEvent, VNode } from "vue";
 import type {
   ExtendedComponentInstance,
-  WatchEffects,
+  PiniaInstance,
+  WatchEffect,
 } from "../types/vue-internals";
 import {
   collectSetupState,
@@ -349,23 +350,12 @@ export function collectInstance(
     }
   }
 
-  const pinia = instance.appContext.app.config.globalProperties.$pinia;
+  const pinia = instance.appContext.app.config.globalProperties.$pinia as PiniaInstance;
   collectPiniaState(pinia, nodes, valNodeMap);
 
   // per-component：store 底層值 → component node（storeToRefs ref/reactive）
   // 與 injectRawToLocalNode 同理，每個 component 獨立建立，避免兄弟 component 互蓋
   const storeValToComponentNode = new Map<object, GraphNode>();
-
-  const storeComputedKeySet = new Set<string>();
-  for (const key in rawSetupState) {
-    const val = rawSetupState[key];
-    if (!(typeof val === "object" && val !== null)) continue;
-    if (!(val as any)?.$id) continue;
-    const raw = (val as any).__v_raw ?? val;
-    for (const k in raw) {
-      if ((raw[k] as any)?.effect) storeComputedKeySet.add(k);
-    }
-  }
 
   if (rawSetupState) {
     collectSetupState({
@@ -375,7 +365,6 @@ export function collectInstance(
       nodes,
       valNodeMap,
       skipKeys: injectKeySet,
-      storeComputedKeySet,
       storeValToComponentNode,
     });
   }
@@ -388,7 +377,7 @@ export function collectInstance(
   );
 
   if (watchEffects && watchEffects.length > 0) {
-    watchEffects.forEach((_effect: WatchEffects, index: number) => {
+    watchEffects.forEach((_effect: WatchEffect, index: number) => {
       nodes.push({
         id: `${componentName}.w_${index}`,
         varName: `w_${index}`,
@@ -582,7 +571,7 @@ export function triggerInstance(
   );
 
   if (watchEffects && watchEffects.length > 0) {
-    watchEffects.forEach((effect: WatchEffects, index: number) => {
+    watchEffects.forEach((effect: WatchEffect, index: number) => {
       const watchShortName = `w_${index}`;
       const watchNode = nodes.find(
         (n) => n.type === "watch" && n.varName === watchShortName,

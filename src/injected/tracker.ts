@@ -1,9 +1,10 @@
 import { GraphNode, notifyUpdate } from "../graph";
 import type {
   ComputedRefImpl,
-  RawSetupState,
   TrackEvent,
   Data,
+  TrackedTarget,
+  PiniaInstance,
 } from "../types/vue-internals";
 
 function forceComputedEval(val: ComputedRefImpl): void {
@@ -29,7 +30,7 @@ export function isStoreToRefsRef(val: unknown): boolean {
 
 function buildNode(
   key: string,
-  val: ComputedRefImpl | any,
+  val: TrackedTarget,
   namespace: string,
   file: string,
 ): GraphNode | null {
@@ -91,7 +92,6 @@ interface CollectSetupStateParams {
   nodes: GraphNode[];
   valNodeMap: WeakMap<object, GraphNode>;
   skipKeys?: Set<string>;
-  storeComputedKeySet?: Set<string>;
   storeValToComponentNode: Map<object, GraphNode>;
 }
 
@@ -103,7 +103,6 @@ export function collectSetupState({
   nodes,
   valNodeMap,
   skipKeys,
-  storeComputedKeySet,
   storeValToComponentNode,
 }: CollectSetupStateParams): void {
   for (const key in rawSetupState) {
@@ -114,70 +113,51 @@ export function collectSetupState({
     if (typeof val !== "object" || val === null) continue;
     if (isPiniaStoreProxy(val)) continue;
     if (valNodeMap.has(val)) continue;
+    const setupData = val as TrackedTarget
 
     // storeToRefs ref/reactive wrapper（ObjectRefImpl）
     // _object 是 store proxy，_key 是屬性名，透過這兩個靜態建立 component node 與 store node 的連結
-    if (isStoreToRefsRef(val)) {
-      const storeRaw = (val as any)._object?.__v_raw ?? (val as any)._object;
-      const storeKey = (val as any)._key;
+    if (isStoreToRefsRef(setupData)) {
+      const storeRaw = (setupData as any)._object?.__v_raw ?? (setupData as any)._object;
+      const storeKey = (setupData as any)._key;
       const storeVal = storeRaw?.[storeKey];
       const storeNode =
         storeVal && typeof storeVal === "object"
           ? valNodeMap.get(storeVal as object)
           : undefined;
 
-      val.__vrg_depKey = key;
-      const componentNode = buildNode(key, val, namespace, file);
+      setupData.__vrg_depKey = key;
+      const componentNode = buildNode(key, setupData, namespace, file);
       if (componentNode && storeNode) {
         componentNode.deps.push(storeNode.id);
         if (!storeNode.subs.includes(componentNode.id))
           storeNode.subs.push(componentNode.id);
         storeValToComponentNode.set(storeVal as object, componentNode);
-        valNodeMap.set(val, componentNode);
+        valNodeMap.set(setupData, componentNode);
         nodes.push(componentNode);
       }
       continue;
     }
 
-    // TODO: storeToRefs wrapper computed（getter）
-    // storeToRefs 的 computed getter 產生全新的 wrapper ComputedRefImpl，與 ref/reactive 的 ObjectRefImpl 不同
-    // 需要 mini-trigger（forceComputedEval + 暫時覆蓋 onTrack）才能找到對應的 store computed node
-    // 目前暫時跳過，待後續實作時應建立 component node 並連結至 store node（同 ref/reactive 的處理方式）
-    // if ((val as any)?.effect && storeComputedKeySet?.has(key)) {
-    //   let foundStoreNode: GraphNode | undefined;
-    //   const savedOnTrack = (val as any).onTrack;
-    //   (val as any).onTrack = (event: TrackEvent) => {
-    //     const node = valNodeMap.get(event.target as object);
-    //     if (node?.type === "store") foundStoreNode = node;
-    //   };
-    //   forceComputedEval(val as unknown as ComputedRefImpl);
-    //   (val as any).onTrack = savedOnTrack;
-    //   if (foundStoreNode) {
-    //     val.__vrg_depKey = `${foundStoreNode.id}`;
-    //     valNodeMap.set(val, foundStoreNode);
-    //     continue;
-    //   }
-    // }
-
     //onTrack 只拿得到 event.target（響應式物件本身），無法直接得知變數名
     // 直接將 key 掛在物件上，讓 onTrack 能取得對應的 varName
-    val.__vrg_depKey = key;
+    setupData.__vrg_depKey = key;
 
-    const node = buildNode(key, val, namespace, file);
+    const node = buildNode(key, setupData, namespace, file);
     if (node) {
-      valNodeMap.set(val, node);
+      valNodeMap.set(setupData, node);
       nodes.push(node);
     }
   }
 }
 
 export function collectPiniaState(
-  pinia: any,
+  pinia: PiniaInstance,
   nodes: GraphNode[],
   valNodeMap: WeakMap<object, GraphNode>,
 ): void {
   if (!pinia?._s) return;
-  pinia._s.forEach((store: any) => {
+  pinia._s.forEach((store) => {
     const storeId: string = store.$id;
     const raw = store.__v_raw ?? store;
     for (const key in raw) {
@@ -255,7 +235,7 @@ export function resolveDepNode({
 }
 
 interface BindSetupTrackParams {
-  rawSetupState: RawSetupState;
+  rawSetupState: Data;
   componentName: string;
   valNodeMap: WeakMap<object, GraphNode>;
   propKeyNodeMap: WeakMap<object, Map<string, GraphNode>>;
@@ -274,13 +254,14 @@ export function bindSetupTrack({
 }: BindSetupTrackParams): void {
   for (const key in rawSetupState) {
     const val = rawSetupState[key];
+    const computed = val as ComputedRefImpl
 
-    if (val?.effect) {
-      const subNode = valNodeMap.get(val as object);
+    if (computed?.effect) {
+      const subNode = valNodeMap.get(computed as object);
       if (!subNode || subNode.type === "store") continue;
 
-      val.onTrack = (event: TrackEvent) => {
-        const subNode = valNodeMap.get(val as object)!;
+      computed.onTrack = (event: TrackEvent) => {
+        const subNode = valNodeMap.get(computed as object)!;
         if (!subNode) return;
 
         // storeToRefs wrapper computed 執行時會先存取 storeProxy 再存取 internal computed
@@ -320,7 +301,7 @@ export function bindSetupTrack({
         notifyUpdate();
       };
 
-      forceComputedEval(val);
+      forceComputedEval(computed);
     }
   }
 }

@@ -5,15 +5,9 @@ import {
   deleteHmrOverride,
   resetComponentKeyCounts,
 } from "./walker";
-import type { ExtendedComponentInstance } from "../types/vue-internals";
+import type { ExtendedComponentInstance, VueAppInternals } from "../types/vue-internals";
 import { getGraph, setOnUpdate } from "../graph";
 import type { NodeType } from "../graph";
-
-interface VueAppInternals {
-  __vue_app__?: {
-    _instance: ExtendedComponentInstance | null;
-  };
-}
 
 const appEl = document.querySelector("#app") as
   | (Element & VueAppInternals)
