@@ -5,7 +5,6 @@ export type Data = Record<string, unknown>
 
 // 被追蹤的響應式物件（ref、reactive、pinia store state）
 export interface TrackedTarget {
-  __vrg_depKey?: string
   __node?: GraphNode
   $id?: string // pinia store 識別碼
   [key: string | symbol]: unknown
@@ -32,7 +31,6 @@ export interface ComputedRefImpl {
   globalVersion: number
   _trackId?: number
   value: unknown
-  __vrg_depKey?: string
 }
 
 // 擴充 EffectScope，加入 Vue 未公開的 effects 欄位

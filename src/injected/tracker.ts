@@ -65,10 +65,9 @@ function buildNode(
   }
 
   if (val.__v_isReactive) {
-    // reactive proxy — snapshot，過濾 Vue internal 和 __vrg_depKey
     const snapshot = Object.fromEntries(
       Object.entries(val as unknown as Record<string, unknown>).filter(
-        ([k]) => !k.startsWith("__v_") && k !== "__vrg_depKey",
+        ([k]) => !k.startsWith("__v_"),
       ),
     );
 
@@ -126,7 +125,6 @@ export function collectSetupState({
           ? valNodeMap.get(storeVal as object)
           : undefined;
 
-      setupData.__vrg_depKey = key;
       const componentNode = buildNode(key, setupData, namespace, file);
       if (componentNode && storeNode) {
         componentNode.deps.push(storeNode.id);
@@ -139,13 +137,12 @@ export function collectSetupState({
       continue;
     }
 
-    //onTrack 只拿得到 event.target（響應式物件本身），無法直接得知變數名
-    // 直接將 key 掛在物件上，讓 onTrack 能取得對應的 varName
-    setupData.__vrg_depKey = key;
-
     const node = buildNode(key, setupData, namespace, file);
     if (node) {
       valNodeMap.set(setupData, node);
+      // reactive proxy 的 onTrack event.target 是 raw object（非 proxy），需同時存 raw key
+      const rawTarget = (setupData as any).__v_raw as object | undefined;
+      if (rawTarget) valNodeMap.set(rawTarget, node);
       nodes.push(node);
     }
   }
@@ -164,7 +161,6 @@ export function collectPiniaState(
       if (key.startsWith("$") || key.startsWith("_")) continue;
       const val = raw[key];
       if (typeof val !== "object" || val === null) continue;
-      val.__vrg_depKey = `${storeId}.${key}`;
       const node: GraphNode = {
         id: `${storeId}.${key}`,
         varName: key,
@@ -175,6 +171,8 @@ export function collectPiniaState(
         subs: [],
       };
       valNodeMap.set(val, node);
+      const rawVal = (val as any).__v_raw as object | undefined;
+      if (rawVal) valNodeMap.set(rawVal, node);
       nodes.push(node);
     }
   });
@@ -184,10 +182,11 @@ export function resolveDepName(
   target: object,
   key: string | symbol,
   propKeyNodeMap: WeakMap<object, Map<string, GraphNode>>,
+  valNodeMap: WeakMap<object, GraphNode>,
 ): string | undefined {
   return (
     (isPiniaStoreProxy(target) ? String(key) : undefined) ??
-    (target as any).__vrg_depKey ??
+    valNodeMap.get(target)?.varName ??
     (propKeyNodeMap.has(target) ? String(key) : undefined)
   );
 }
@@ -272,6 +271,7 @@ export function bindSetupTrack({
           event.target as object,
           event.key,
           propKeyNodeMap,
+          valNodeMap,
         );
         if (!depName) return;
 

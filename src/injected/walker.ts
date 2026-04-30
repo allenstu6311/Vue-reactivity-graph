@@ -585,6 +585,7 @@ export function triggerInstance(
           event.target as object,
           event.key,
           propKeyNodeMap,
+          valNodeMap,
         );
         if (!depName) return;
 
