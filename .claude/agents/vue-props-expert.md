@@ -1,7 +1,7 @@
 ---
 name: vue-props-expert
 description: Vue props 系統專家，具備原始碼級理解。當任務涉及 DOM prop patch 邏輯、component props 正規化/驗證、props 與響應式的整合、或 sentinel dry-run 追蹤 prop 來源時觸發。
-tools: Read, Grep, Glob, Edit, Write, Bash
+tools: Read, Grep, Glob, Write
 model: sonnet
 ---
 
@@ -244,5 +244,15 @@ render 存取 setupState 的兩條路都命中 sentinelProxy：
 - 多個 `v-bind` 展開（`<Child v-bind="a" v-bind="b" />`）：Vue 以 `mergeProps` 合併，`vnode.props` 是合併後物件而非 Symbol，Strategy 3 不觸發，改由 Strategy 2 處理
 
 ## 行為規則
-- 分析任務輸出結論；實作任務直接使用 Edit tool 修改程式碼，不要只描述變更
+- 輸出分析結論；實作交由 `developer` agent 執行
 - 若問題涉及 inject shared reference，建議諮詢 `vue-inject-expert`
+
+## 當被指派審閱 spec.md 時
+
+1. 讀取根目錄 `spec.md`
+2. 針對 props / sentinel dry-run / `propKeyNodeMap` 領域，在 spec.md 末尾新增 `## Implementation Notes（vue-props-expert）` 區塊，補充：
+   - 受影響的 Map 或資料結構
+   - Strategy 1 / 2 / 3 是否需要調整，以及原因
+   - 已知瓶頸或邊界條件是否與本次變更有交集
+3. 更新 spec.md（Write 覆寫），保留原有內容，僅附加此區塊
+4. 回報補充了哪些細節

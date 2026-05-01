@@ -1,7 +1,7 @@
 ---
 name: vue-inject-expert
 description: Vue provide/inject 追蹤專家，具備原始碼級理解。當任務涉及 inject 節點建立、injectRawToNodeMap / injectRawToLocalNode 雙 Map 設計、resolveDepNode 查找順序，或 shared reference 污染問題時觸發。
-tools: Read, Grep, Glob, Edit, Write, Bash
+tools: Read, Grep, Glob, Write
 model: sonnet
 ---
 
@@ -147,5 +147,15 @@ inject 必須最優先的原因：shared reference 若落到 `valNodeMap` 層，
 
 ## 行為規則
 - 遇到 onTrack target 相同但 component 不同的問題，優先懷疑 inject shared reference
-- 分析任務輸出結論；實作任務直接使用 Edit tool 修改程式碼，不要只描述變更
+- 輸出分析結論；實作交由 `developer` agent 執行
 - 若問題同時涉及 props 傳遞 inject 值，說明邊界並建議諮詢 `vue-props-expert`
+
+## 當被指派審閱 spec.md 時
+
+1. 讀取根目錄 `spec.md`
+2. 針對 inject / provide 追蹤領域，在 spec.md 末尾新增 `## Implementation Notes（vue-inject-expert）` 區塊，補充：
+   - `injectRawToNodeMap` / `injectRawToLocalNode` 雙 Map 是否需要調整
+   - `resolveDepNode` 查找順序是否受影響
+   - shared reference 污染風險是否與本次變更有關
+3. 更新 spec.md（Write 覆寫），保留原有內容，僅附加此區塊
+4. 回報補充了哪些細節

@@ -52,7 +52,7 @@
 |---|---|
 | `injected/index.ts` | 入口：取 `__vue_app__._instance`，掛 HMR hook，呼叫 walker |
 | `injected/walker.ts` | 核心：遍歷 component instance tree，sentinel dry-run 追蹤 prop 來源，建立 GraphNode[] |
-| `injected/tracker.ts` | 識別 ref/reactive/computed/watch，標記 `__vrg_depKey`，建 valNodeMap |
+| `injected/tracker.ts` | 識別 ref/reactive/computed/watch，建 valNodeMap；resolveDepName / resolveDepNode |
 | `graph/types.ts` | 純型別：NodeType, GraphNode, ComponentGraph |
 | `graph/index.ts` | graph 全域狀態 + getGraph / updateGraph / notifyUpdate |
 | `types/vue-internals.d.ts` | Vue 未公開內部型別（ComputedRefImpl, ExtendedComponentInstance 等） |
@@ -70,8 +70,8 @@
 
 ## 命名慣例
 
-- `__vrg_` 前綴為本插件（Vue Reactivity Graph）專用，直接掛在 Vue 響應式物件上的屬性都使用此前綴
-- 避免與 Vue 內部的 `__v_` 前綴衝突
+- 本插件不再對 Vue 響應式物件進行 monkey-patching（已移除 `__vrg_depKey`）
+- 若未來需要在 Vue 物件上掛屬性，仍使用 `__vrg_` 前綴，避免與 Vue 內部 `__v_` 前綴衝突
 
 ---
 
@@ -97,9 +97,25 @@
 
 ## Agent 使用規則
 
-- **需求分析前**：使用者描述新功能、Bug 修復、重構需求 → 必須先呼叫 `spec-writer` agent
-- **props 相關**：涉及 prop 傳遞、sentinel dry-run、`propKeyNodeMap`、prop 來源追蹤 → 呼叫 `vue-props-expert`
-- **setup state 相關**：涉及 `valNodeMap`、`collectSetupState`、ref/reactive/computed 識別 → 呼叫 `vue-setup-state-expert`
-- **inject 相關**：涉及 `injectRawToNodeMap`、`resolveDepNode` inject 路徑、provide/inject 追蹤 → 呼叫 `vue-inject-expert`
-- **Pinia 相關**：涉及 `storeToRefs`、Pinia store 追蹤、dep 結構 → 呼叫 `vue-pinia-expert`
+所有開發需求（Feature / Bugfix / Refactor）走以下固定流程，不得跳步：
+
+**Step 1 — 需求分析**
+收到任何需求，立刻呼叫 `spec-writer`，產出 `spec.md`。
+
+**Step 2 — 領域審閱**
+`spec-writer` 完成後，根據 spec.md 末尾的「審閱建議」呼叫對應的 Vue 領域代理人，審閱並補充實作細節：
+- props / sentinel dry-run / `propKeyNodeMap` → `vue-props-expert`
+- `valNodeMap` / `collectSetupState` / ref/reactive/computed 識別 → `vue-setup-state-expert`
+- `injectRawToNodeMap` / `resolveDepNode` inject 路徑 / provide/inject 追蹤 → `vue-inject-expert`
+- `storeToRefs` / Pinia store 追蹤 / dep 結構 → `vue-pinia-expert`
+- 任務橫跨多個領域時，依上列順序逐一呼叫
+
+**Step 3 — 使用者確認**
+等使用者明確說「可以開始了」（或同等意思），才進入下一步。
+
+**Step 4 — 實作**
+呼叫 `developer`，按已確認的 spec.md 執行程式碼修改。
+
+**Step 5 — 補測試（視情況）**
+`developer` 完成後，由 `developer` 自行判斷是否呼叫 `test-writer`。
 

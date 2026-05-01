@@ -81,7 +81,7 @@ graph TD
     J -->|否| O
 
     N --> O[collectSetupState\n跳過 props 與 injectKeySet]
-    O --> P[每個 key\nval.__vrg_depKey = key\nbuildNode 判斷型別\nvalNodeMap.set val, node]
+    O --> P[每個 key\nbuildNode 判斷型別\nvalNodeMap.set val, node]
 
     P --> Q[建 watch 節點\nscope.effects 排除 render effect\nw_0, w_1...]
 
@@ -98,12 +98,12 @@ graph TD
 ```mermaid
 graph TD
     A([triggerInstance]) --> B[Inject Override\n必須在 bindSetupTrack 之前]
-    B --> C[每個 inject node\nraw = node.val.__v_raw ?? node.val\nvalNodeMap.set raw, injectNode\nraw.__vrg_depKey = node.varName\n每個 component 循序執行不互蓋]
+    B --> C[建 per-component injectRawToLocalNode\n每個 inject node\nraw = node.val.__v_raw ?? node.val\ninjectRawToLocalNode.set raw, injectNode\n每個 component 循序執行不互蓋]
 
     C --> D[bindSetupTrack\n每個 val.fn computed]
     D --> E[掛 val.onTrack]
     E --> F[強制 dirty\nflags, globalVersion = -1\nval.value 觸發 getter]
-    F --> G[onTrack 觸發\ndepName = target.__vrg_depKey ?? event.key\nsubNode.deps.push depName]
+    F --> G[onTrack 觸發\ndepName = resolveDepName(target, event.key)\nsubNode.deps.push depName]
     G --> H[resolveDepNode]
 
     subgraph resolveDepNode
