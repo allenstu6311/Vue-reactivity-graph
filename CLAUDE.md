@@ -79,12 +79,6 @@
 
 請在每次對話開始時讀取 `ARCHITECTURE.md`與 `DESIGN_NOTES.md`。
 
-涉及 tracking 子系統時，讀取對應的 `docs/tracking/` 文件：
-- `docs/tracking/setup-state.md`：ref / reactive / computed 識別與 valNodeMap
-- `docs/tracking/inject.md`：provide / inject 追蹤、injectRawToNodeMap、shared reference
-- `docs/tracking/props.md`：prop 來源追蹤、sentinel dry-run、propKeyNodeMap
-- `docs/tracking/pinia.md`：storeToRefs ref / reactive / computed wrapper 追蹤行為
-
 ---
 
 ## Guardrails

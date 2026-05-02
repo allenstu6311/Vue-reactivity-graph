@@ -2,6 +2,7 @@
   "permissions": {
     "allow": [
       "Edit(**/*.md)",
+      "Write(**/*.md)",
       "Bash(npm install)",
       "Bash(npm run build)",
       "Bash(pnpm add @vue-flow/core @dagrejs/dagre)",
