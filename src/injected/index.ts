@@ -5,7 +5,7 @@ import {
   deleteHmrOverride,
   resetComponentKeyCounts,
 } from "./walker";
-import type { ExtendedComponentInstance, VueAppInternals } from "../types/vue-internals";
+import type { ExtendedComponentInstance, HookComponentEventArgs, VueAppInternals } from "../types/vue-internals";
 import { getGraph, setOnUpdate } from "../graph";
 import type { NodeType } from "../graph";
 
@@ -58,23 +58,23 @@ if (app) {
     const originalReload = hmr.reload;
     const originalRender = hmr.rerender;
 
-    hmr.reload = function (id: string, newComp: any) {
+    hmr.reload = function (id: string, _newComp: unknown) {
       pendingHmrIds.add(id);
-      return originalReload.call(this, id, newComp);
+      return originalReload.call(this, id, _newComp);
     };
 
-    hmr.rerender = function (id: string, newComp: any) {
+    hmr.rerender = function (id: string, _newComp: unknown) {
       pendingHmrIds.add(id);
-      return originalRender.call(this, id, newComp);
+      return originalRender.call(this, id, _newComp);
     };
   }
 
-  hook.emit = function (event: string, ...args: any[]) {
+  hook.emit = function (event: string, ...args: unknown[]) {
     if (
       (event === "component:added" || event === "component:updated") &&
       pendingHmrIds.size > 0
     ) {
-      const [vueApp, , , instance] = args;
+      const [vueApp, , , instance] = args as HookComponentEventArgs;
       const hmrId: string | undefined = (instance?.type as any)?.__hmrId;
       if (hmrId && pendingHmrIds.has(hmrId)) {
         pendingHmrIds.delete(hmrId);

@@ -1,7 +1,10 @@
 import type { DebuggerEvent, VNode } from "vue";
 import type {
+  Data,
   ExtendedComponentInstance,
   PiniaInstance,
+  RawAppContext,
+  SentinelVNode,
   WatchEffect,
 } from "../types/vue-internals";
 import {
@@ -58,23 +61,23 @@ function resolveInstance(
 
 // 對齊 Vue 的 resolveAsset 邏輯：exact → camelCase → PascalCase
 function resolveGlobalComponent(
-  appContext: any,
+  appContext: RawAppContext | null | undefined,
   name: string,
 ): object | undefined {
   const components = appContext?.components;
   if (!components) return undefined;
   const camel = name.replace(/-(\w)/g, (_, c: string) => c.toUpperCase());
   const pascal = camel.charAt(0).toUpperCase() + camel.slice(1);
-  return components[name] ?? components[camel] ?? components[pascal];
+  return (components[name] ?? components[camel] ?? components[pascal]) as object | undefined;
 }
 
 // 遍歷 dry-run VNode tree，找出子元件 props 中的 sentinel symbol
 function traverseVNodeForSentinels(
-  vnode: any,
+  vnode: SentinelVNode | null | undefined,
   sentinelToKey: Map<symbol, string>,
   rawSetupState: object,
   result: Map<object, { maps: Map<string, string>[]; nextIndex: number }>,
-  appContext: any,
+  appContext: RawAppContext | null | undefined,
 ): void {
   if (!vnode || typeof vnode !== "object") return;
 
@@ -146,7 +149,7 @@ function traverseVNodeForSentinels(
   if (Array.isArray(children)) {
     for (const child of children) {
       traverseVNodeForSentinels(
-        child,
+        child as SentinelVNode | null | undefined,
         sentinelToKey,
         rawSetupState,
         result,
@@ -162,7 +165,7 @@ function traverseVNodeForSentinels(
           if (Array.isArray(slotVNodes)) {
             for (const sv of slotVNodes) {
               traverseVNodeForSentinels(
-                sv,
+                sv as SentinelVNode | null | undefined,
                 sentinelToKey,
                 rawSetupState,
                 result,
@@ -253,13 +256,13 @@ export function collectInstance(
         if (sourceKey.startsWith("props.") && instance.parent?.props) {
           // props.test => test
           const parentPropKey = sourceKey.slice(6);
-          const parentRawPropsObj = ((instance.parent.props as any).__v_raw ??
+          const parentRawPropsObj = (instance.parent.props.__v_raw ??
             instance.parent.props) as object;
           parentNode = propKeyNodeMap
             .get(parentRawPropsObj)
             ?.get(parentPropKey);
         } else if (parentRawSetupState) {
-          const sourceRaw = (parentRawSetupState as any)[sourceKey];
+          const sourceRaw = parentRawSetupState[sourceKey];
           if (sourceRaw)
             parentNode =
               propSourceInjectMap.get(sourceRaw) ?? valNodeMap.get(sourceRaw);
@@ -292,7 +295,7 @@ export function collectInstance(
       ((instance.parent?.type as any)?.name as string) ||
       "Anonymous";
     for (const key of provideKeys) {
-      const val = (parentProvides as any)[key];
+      const val = parentProvides[key];
       if (typeof val !== "object" || val === null) continue;
       const raw = (val as any).__v_raw;
       const lookupKey = (raw && typeof raw === "object" ? raw : val) as object;
@@ -392,10 +395,10 @@ export function collectInstance(
 
   // Sentinel dry-run：對每個 setupState key 回傳唯一 symbol
   // 捕捉 dry-run VNode，從子元件 props 中的 sentinel 直接建立 propName → parentKey 對應
-  if ((instance as any).render && (Object.keys(rawSetupState).length > 0 || !!propsOptions)) {
+  if (instance.render && (Object.keys(rawSetupState).length > 0 || !!propsOptions)) {
     //withProxy 是給 runtime-compiled 模板（with block）使用的 proxy，有不同的 has trap
     // 讓 with(ctx){...} 的屬性查找能正確運作，沒有時 fallback 到一般 proxy
-    const proxyToUse = (instance as any).withProxy ?? (instance as any).proxy;
+    const proxyToUse = instance.withProxy ?? instance.proxy;
     const sentinelToKey = new Map<symbol, string>();
 
     const propsSentinelProxy = propsOptions
@@ -419,7 +422,7 @@ export function collectInstance(
     //sentinel proxy 讓每個 setupState key 回傳唯一 Symbol 代替真實值
     // render 執行後，VNode props 中出現的 Symbol 就能直接對應回父層的 key 名
     // 不需要比對 value（primitive 值會碰撞），每個 Symbol 天生唯一
-    const sentinelProxy = new Proxy((instance.setupState ?? {}) as object, {
+    const sentinelProxy = new Proxy((instance.setupState ?? {}) as Data, {
       get(target, key, receiver) {
         if (typeof key === "string" && !key.startsWith("__v_")) {
           //  <AboutView :aboutData="props.text" />
@@ -448,14 +451,14 @@ export function collectInstance(
     try {
       //編譯後的 render 函數簽名為 (ctx, cache, $props, $setup, $data, $options)
       // $setup 必須傳入 sentinelProxy，模板的 _ctx.xxx 才會存取到 sentinel 值
-      dryRunVNode = (instance as any).render.call(
+      dryRunVNode = instance.render!.call(
         proxyToUse,
-        proxyToUse, // _ctx
-        (instance as any).renderCache ?? [], // _cache
+        proxyToUse!,
+        instance.renderCache ?? [], // _cache
         instance.props, // $props ← props sentinel
         sentinelProxy, // $setup ← sentinel proxy
-        (instance as any).data ?? {}, // $data
-        (instance as any).ctx ?? {}, // $options
+        instance.data ?? {}, // $data
+        instance.ctx ?? {}, // $options
       );
     } catch {
       // ignore render errors during dry-run
@@ -473,7 +476,7 @@ export function collectInstance(
         { maps: Map<string, string>[]; nextIndex: number }
       >();
       traverseVNodeForSentinels(
-        dryRunVNode,
+        dryRunVNode as SentinelVNode | null | undefined,
         sentinelToKey,
         rawSetupState,
         childPropMap,

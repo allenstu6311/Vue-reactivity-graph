@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Component, computed } from 'vue'
+import { computed } from 'vue'
+import type { NodeComponent } from '@vue-flow/core'
 import { VueFlow } from '@vue-flow/core'
 import GraphNode from './GraphNode.vue'
 import { buildLayout } from '../composables/useLayout'
@@ -11,7 +12,7 @@ const props = defineProps<{
   selectedId: string | null
 }>()
 
-const nodeTypes: NodeTypesObject = { graphNode: GraphNode as Component }
+const nodeTypes: NodeTypesObject = { graphNode: GraphNode as NodeComponent }
 
 const layout = computed(() =>
   props.selectedId ? buildLayout(props.nodes, props.selectedId) : { nodes: [], edges: [] },
