@@ -2,6 +2,7 @@
   "permissions": {
     "allow": [
       "Edit(**/*.md)",
+      "Edit(.claude/**)",
       "Write(**/*.md)",
       "Bash(npm install)",
       "Bash(npm run build)",
