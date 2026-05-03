@@ -1,22 +1,16 @@
 {
   "permissions": {
     "allow": [
+      "Bash(*)",
       "Edit(**)",
       "Write(**)",
-      "Bash(npm install)",
-      "Bash(npm run build)",
-      "Bash(pnpm add @vue-flow/core @dagrejs/dagre)",
-      "Bash(pnpm add -D @types/dagre)",
-      "Bash(pnpm build)",
-      "Bash(pnpm tsc --noEmit)",
-      "Bash(pnpm test)",
-      "Bash(pnpm test --run)",
-      "Bash(pnpm add lodash-es)",
-      "Bash(pnpm add -D @types/lodash-es)",
       "WebSearch",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "WebFetch(domain:github.com)",
-      "Bash(curl -s \"https://raw.githubusercontent.com/vuejs/devtools/main/packages/chrome-extension/src/background.ts\")"
+      "WebFetch(domain:github.com)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)"
     ]
   }
 }
