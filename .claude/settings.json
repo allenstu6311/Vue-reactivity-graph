@@ -1,14 +1,18 @@
 {
   "permissions": {
     "allow": [
-      "Edit(**/*.md)",
-      "Edit(.claude/**)",
-      "Write(**/*.md)",
+      "Edit(**)",
+      "Write(**)",
       "Bash(npm install)",
       "Bash(npm run build)",
       "Bash(pnpm add @vue-flow/core @dagrejs/dagre)",
       "Bash(pnpm add -D @types/dagre)",
       "Bash(pnpm build)",
+      "Bash(pnpm tsc --noEmit)",
+      "Bash(pnpm test)",
+      "Bash(pnpm test --run)",
+      "Bash(pnpm add lodash-es)",
+      "Bash(pnpm add -D @types/lodash-es)",
       "WebSearch",
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:github.com)",
