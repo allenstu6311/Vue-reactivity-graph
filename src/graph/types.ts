@@ -6,8 +6,8 @@ export interface GraphNode {
   type: NodeType
   val: unknown
   file: string
-  deps: string[]  // 依賴的變數名稱（短名），computed / watch 有
-  subs: string[]  // 被訂閱的變數名稱（短名），ref / reactive / computed 有
+  deps: string[]  // 依賴節點的完整 id（`componentName.varName` 格式），computed / watch 有
+  subs: string[]  // 訂閱者節點的完整 id（`componentName.varName` 格式），ref / reactive / computed 有
 }
 
 export type ComponentGraph = Record<string, GraphNode[]>

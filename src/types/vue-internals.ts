@@ -4,19 +4,19 @@ import type { GraphNode } from '../graph/types'
 export type Data = Record<string | symbol, unknown>
 
 // 被追蹤的響應式物件（ref、reactive、pinia store state）
-export interface TrackedTarget {
+export interface ReactiveTarget {
   __node?: GraphNode
   $id?: string // pinia store 識別碼
   [key: string | symbol]: unknown
 }
 
 export interface PiniaInstance {
-  _s: Map<string, { $id: string; __v_raw?: Record<string, TrackedTarget> } & Record<string, TrackedTarget>>
+  _s: Map<string, { $id: string; __v_raw?: Record<string, ReactiveTarget> } & Record<string, ReactiveTarget>>
 }
 
 // onTrack 的事件物件
-export interface TrackEvent {
-  target: TrackedTarget
+export interface OnTrackEvent {
+  target: ReactiveTarget
   key: string | symbol
 }
 
@@ -26,7 +26,7 @@ export type WatchEffect = ReactiveEffect
 export interface ComputedRefImpl {
   fn?: () => unknown
   effect?: object
-  onTrack?: (event: TrackEvent) => void
+  onTrack?: (event: OnTrackEvent) => void
   flags: number
   globalVersion: number
   _trackId?: number

@@ -6,15 +6,15 @@ import type { ComponentGraph } from '../graph'
 import { devLog } from './utils'
 
 const graph = ref<ComponentGraph>({})
-const currentComp = ref<string>('')
+const selectedComponentName = ref<string>('')
 const selectedId = ref<string | null>(null)
 
-const compOptions = computed(() => Object.keys(graph.value))
-const currentNodes = computed(() => graph.value[currentComp.value] ?? [])
+const componentKeys = computed(() => Object.keys(graph.value))
+const currentNodes = computed(() => graph.value[selectedComponentName.value] ?? [])
 const allNodes = computed(() => Object.values(graph.value).flat())
 
-function onSwitchComp(comp: string) {
-  currentComp.value = comp
+function onSelectComponent(comp: string) {
+  selectedComponentName.value = comp
   selectedId.value = null
 }
 
@@ -30,8 +30,8 @@ function fetchGraph() {
       const data = JSON.parse(result) as ComponentGraph
       graph.value = data
       // devLog('graph fetched, components:', Object.keys(data))
-      if (!currentComp.value || !data[currentComp.value]) {
-        currentComp.value = Object.keys(data)[0] ?? ''
+      if (!selectedComponentName.value || !data[selectedComponentName.value]) {
+        selectedComponentName.value = Object.keys(data)[0] ?? ''
       }
     },
   )
@@ -57,11 +57,11 @@ onMounted(() => {
           <div class="select-row">
             <select
               class="comp-select"
-              :value="currentComp"
-              @change="onSwitchComp(($event.target as HTMLSelectElement).value)"
+              :value="selectedComponentName"
+              @change="onSelectComponent(($event.target as HTMLSelectElement).value)"
             >
 
-              <option v-for="key in compOptions" :key="key" :value="key">
+              <option v-for="key in componentKeys" :key="key" :value="key">
                 {{ graph[key][0]?.file ?? key }}.vue
               </option>
             </select>

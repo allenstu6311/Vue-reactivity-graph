@@ -53,10 +53,10 @@ export function deleteHmrOverride(id: string): void {
 }
 
 function resolveInstance(
-  old: ExtendedComponentInstance,
+  instance: ExtendedComponentInstance,
 ): ExtendedComponentInstance {
-  const hmrId = (old?.type as any)?.__hmrId;
-  return hmrId && hmrOverrideMap.has(hmrId) ? hmrOverrideMap.get(hmrId)! : old;
+  const hmrId = (instance?.type as any)?.__hmrId;
+  return hmrId && hmrOverrideMap.has(hmrId) ? hmrOverrideMap.get(hmrId)! : instance;
 }
 
 // 對齊 Vue 的 resolveAsset 邏輯：exact → camelCase → PascalCase
@@ -183,25 +183,25 @@ function traverseVNodeForSentinels(
 
 // Phase 1: 蒐集所有節點，不觸發任何訂閱者
 export function collectInstance(
-  oldInstance: ExtendedComponentInstance,
-  prevComponentName?: string,
+  rawInstance: ExtendedComponentInstance,
+  parentComponentName?: string,
 ): void {
-  const instance = resolveInstance(oldInstance);
+  const instance = resolveInstance(rawInstance);
 
   const file =
     ((instance.type as Record<string, unknown>).__name as string) ||
     ((instance.type as Record<string, unknown>).name as string) ||
     "Anonymous";
 
-  const baseComponentName = prevComponentName
-    ? `${prevComponentName}.${file}`
+  const undeduplicatedName = parentComponentName
+    ? `${parentComponentName}.${file}`
     : file;
 
   // 子組件重用
-  const count = componentKeyCountMap.get(baseComponentName) ?? 0;
-  componentKeyCountMap.set(baseComponentName, count + 1);
+  const count = componentKeyCountMap.get(undeduplicatedName) ?? 0;
+  componentKeyCountMap.set(undeduplicatedName, count + 1);
   const componentName =
-    count === 0 ? baseComponentName : `${baseComponentName}_${count}`;
+    count === 0 ? undeduplicatedName : `${undeduplicatedName}_${count}`;
 
   const nodes: GraphNode[] = [];
 
@@ -221,16 +221,16 @@ export function collectInstance(
     // 因此另開 propKeyNodeMap，讓 onTrack 能從 props raw object 查到對應的 prop node
     propKeyNodeMap.set(rawPropsObj, propMap);
 
-    const parentChildPropMap = instance.parent
+    const parentSentinelResult = instance.parent
       ? instanceChildPropKeyMap.get(instance.parent)
       : undefined;
 
-    const typeData = parentChildPropMap?.get(
+    const siblingPropMaps = parentSentinelResult?.get(
       instance.type as unknown as object,
     );
 
-    const siblingIndex = typeData?.nextIndex ?? 0;
-    if (typeData) typeData.nextIndex++;
+    const instanceOrdinal = siblingPropMaps?.nextIndex ?? 0;
+    if (siblingPropMaps) siblingPropMaps.nextIndex++;
 
     for (const propKey in propsOptions) {
       const propNode: GraphNode = {
@@ -250,7 +250,7 @@ export function collectInstance(
       let parentNode: GraphNode | undefined;
 
       // sentinel dry-run prop map
-      const sourceKey = typeData?.maps[siblingIndex]?.get(propKey);
+      const sourceKey = siblingPropMaps?.maps[instanceOrdinal]?.get(propKey);
 
       if (sourceKey) {
         if (sourceKey.startsWith("props.") && instance.parent?.props) {
@@ -309,7 +309,7 @@ export function collectInstance(
             ? `anonymous:${key.description ?? "symbol"}`
             : `anonymous:${String(key)}`;
         parentNode = {
-          id: `${prevComponentName}.${keyStr}`,
+          id: `${parentComponentName}.${keyStr}`,
           varName: "anonymous",
           type: (val as any).__v_isRef ? "ref" : "reactive",
           val: lookupKey,
@@ -317,7 +317,7 @@ export function collectInstance(
           deps: [],
           subs: [],
         };
-        getGraph()[prevComponentName!]?.push(parentNode);
+        getGraph()[parentComponentName!]?.push(parentNode);
         valNodeMap.set(lookupKey, parentNode);
       }
 
@@ -363,7 +363,7 @@ export function collectInstance(
   if (rawSetupState) {
     collectSetupState({
       rawSetupState,
-      namespace: componentName,
+      componentName,
       file,
       nodes,
       valNodeMap,
@@ -401,7 +401,7 @@ export function collectInstance(
     const proxyToUse = instance.withProxy ?? instance.proxy;
     const sentinelToKey = new Map<symbol, string>();
 
-    const propsSentinelProxy = propsOptions
+    const sentinelPropsProxy = propsOptions
       ? new Proxy(instance.props as object, {
           get(target, key, receiver) {
             //  <AboutView :aboutData="text" />
@@ -426,7 +426,7 @@ export function collectInstance(
       get(target, key, receiver) {
         if (typeof key === "string" && !key.startsWith("__v_")) {
           //  <AboutView :aboutData="props.text" />
-          if (key === "props" && instance.props) return propsSentinelProxy;
+          if (key === "props" && instance.props) return sentinelPropsProxy;
           const s = Symbol(key);
           sentinelToKey.set(s, key);
           return s;
@@ -436,7 +436,7 @@ export function collectInstance(
     });
 
     const savedProps = instance.props;
-    instance.props = propsSentinelProxy as any;
+    instance.props = sentinelPropsProxy as any;
 
     //暫時替換 instance.setupState 讓 render 存取 sentinel proxy
     // 結束後必須還原，否則會破壞 Vue 的響應式系統
@@ -471,7 +471,7 @@ export function collectInstance(
     instance.props = savedProps;
 
     if (dryRunVNode) {
-      const childPropMap = new Map<
+      const dryRunChildPropMap = new Map<
         object,
         { maps: Map<string, string>[]; nextIndex: number }
       >();
@@ -479,12 +479,12 @@ export function collectInstance(
         dryRunVNode as SentinelVNode | null | undefined,
         sentinelToKey,
         rawSetupState,
-        childPropMap,
+        dryRunChildPropMap,
         instance.appContext,
       );
 
-      if (childPropMap.size > 0) {
-        instanceChildPropKeyMap.set(instance, childPropMap);
+      if (dryRunChildPropMap.size > 0) {
+        instanceChildPropKeyMap.set(instance, dryRunChildPropMap);
       }
     }
   }
@@ -493,40 +493,40 @@ export function collectInstance(
   collectVNode(instance.subTree, componentName);
 }
 
-export function collectVNode(vnode: VNode, prevComponentName?: string): void {
+export function collectVNode(vnode: VNode, parentComponentName?: string): void {
   if (!vnode) return;
   if (vnode.component) {
     collectInstance(
       vnode.component as ExtendedComponentInstance,
-      prevComponentName,
+      parentComponentName,
     );
   }
   if (Array.isArray(vnode.children)) {
     vnode.children.forEach((child) => {
       if (child && typeof child === "object")
-        collectVNode(child as VNode, prevComponentName);
+        collectVNode(child as VNode, parentComponentName);
     });
   }
 }
 
 // Phase 2: 觸發所有訂閱者，此時所有 node 已蒐集完畢
 export function triggerInstance(
-  oldInstance: ExtendedComponentInstance,
-  prevComponentName?: string,
+  rawInstance: ExtendedComponentInstance,
+  parentComponentName?: string,
 ): void {
-  const instance = resolveInstance(oldInstance);
+  const instance = resolveInstance(rawInstance);
   const file =
     ((instance.type as Record<string, unknown>).__name as string) ||
     ((instance.type as Record<string, unknown>).name as string) ||
     "Anonymous";
 
-  const baseComponentName = prevComponentName
-    ? `${prevComponentName}.${file}`
+  const undeduplicatedName = parentComponentName
+    ? `${parentComponentName}.${file}`
     : file;
-  const count = componentKeyCountMap.get(baseComponentName) ?? 0;
-  componentKeyCountMap.set(baseComponentName, count + 1);
+  const count = componentKeyCountMap.get(undeduplicatedName) ?? 0;
+  componentKeyCountMap.set(undeduplicatedName, count + 1);
   const componentName =
-    count === 0 ? baseComponentName : `${baseComponentName}_${count}`;
+    count === 0 ? undeduplicatedName : `${undeduplicatedName}_${count}`;
 
   const rawSetupState = instance.setupState?.["__v_raw"] || {};
   const nodes = getGraph()[componentName] ?? [];
@@ -619,18 +619,18 @@ export function triggerInstance(
   triggerVNode(instance.subTree, componentName);
 }
 
-export function triggerVNode(vnode: VNode, prevComponentName?: string): void {
+export function triggerVNode(vnode: VNode, parentComponentName?: string): void {
   if (!vnode) return;
   if (vnode.component) {
     triggerInstance(
       vnode.component as ExtendedComponentInstance,
-      prevComponentName,
+      parentComponentName,
     );
   }
   if (Array.isArray(vnode.children)) {
     vnode.children.forEach((child) => {
       if (child && typeof child === "object")
-        triggerVNode(child as VNode, prevComponentName);
+        triggerVNode(child as VNode, parentComponentName);
     });
   }
 }

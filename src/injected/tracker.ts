@@ -1,13 +1,13 @@
 import { GraphNode, notifyUpdate } from "../graph";
 import type {
   ComputedRefImpl,
-  TrackEvent,
+  OnTrackEvent,
   Data,
-  TrackedTarget,
+  ReactiveTarget,
   PiniaInstance,
 } from "../types/vue-internals";
 
-function forceComputedEval(val: ComputedRefImpl): void {
+function markComputedDirtyAndEval(val: ComputedRefImpl): void {
   val.flags |= 1 << 4;
   val.flags &= ~(1 << 7);
   val.globalVersion = -1;
@@ -30,11 +30,11 @@ export function isStoreToRefsRef(val: unknown): boolean {
 
 function buildNode(
   key: string,
-  val: TrackedTarget,
-  namespace: string,
+  val: ReactiveTarget,
+  componentName: string,
   file: string,
 ): GraphNode | null {
-  const id = `${namespace}.${key}`;
+  const id = `${componentName}.${key}`;
 
   if (val?.effect) {
     return {
@@ -86,7 +86,7 @@ function buildNode(
 
 interface CollectSetupStateParams {
   rawSetupState: Data;
-  namespace: string;
+  componentName: string;
   file: string;
   nodes: GraphNode[];
   valNodeMap: WeakMap<object, GraphNode>;
@@ -97,7 +97,7 @@ interface CollectSetupStateParams {
 // Phase 1: 建 node、存 valNodeMap
 export function collectSetupState({
   rawSetupState,
-  namespace,
+  componentName,
   file,
   nodes,
   valNodeMap,
@@ -112,36 +112,36 @@ export function collectSetupState({
     if (typeof val !== "object" || val === null) continue;
     if (isPiniaStoreProxy(val)) continue;
     if (valNodeMap.has(val)) continue;
-    const setupData = val as TrackedTarget
+    const trackedVal = val as ReactiveTarget
 
     // storeToRefs ref/reactive wrapper（ObjectRefImpl）
     // _object 是 store proxy，_key 是屬性名，透過這兩個靜態建立 component node 與 store node 的連結
-    if (isStoreToRefsRef(setupData)) {
-      const storeRaw = (setupData as any)._object?.__v_raw ?? (setupData as any)._object;
-      const storeKey = (setupData as any)._key;
+    if (isStoreToRefsRef(trackedVal)) {
+      const storeRaw = (trackedVal as any)._object?.__v_raw ?? (trackedVal as any)._object;
+      const storeKey = (trackedVal as any)._key;
       const storeVal = storeRaw?.[storeKey];
       const storeNode =
         storeVal && typeof storeVal === "object"
           ? valNodeMap.get(storeVal as object)
           : undefined;
 
-      const componentNode = buildNode(key, setupData, namespace, file);
+      const componentNode = buildNode(key, trackedVal, componentName, file);
       if (componentNode && storeNode) {
         componentNode.deps.push(storeNode.id);
         if (!storeNode.subs.includes(componentNode.id))
           storeNode.subs.push(componentNode.id);
         storeValToComponentNode.set(storeVal as object, componentNode);
-        valNodeMap.set(setupData, componentNode);
+        valNodeMap.set(trackedVal, componentNode);
         nodes.push(componentNode);
       }
       continue;
     }
 
-    const node = buildNode(key, setupData, namespace, file);
+    const node = buildNode(key, trackedVal, componentName, file);
     if (node) {
-      valNodeMap.set(setupData, node);
+      valNodeMap.set(trackedVal, node);
       // reactive proxy 的 onTrack event.target 是 raw object（非 proxy），需同時存 raw key
-      const rawTarget = (setupData as any).__v_raw as object | undefined;
+      const rawTarget = (trackedVal as any).__v_raw as object | undefined;
       if (rawTarget) valNodeMap.set(rawTarget, node);
       nodes.push(node);
     }
@@ -212,7 +212,7 @@ export function resolveDepNode({
   injectRawToLocalNode,
   storeValToComponentNode,
 }: ResolveDepNodeParams): GraphNode | undefined {
-  const stateVal =
+  const setupStateVal =
     depName && rawSetupState
       ? (rawSetupState as Record<string, unknown>)[depName]
       : undefined;
@@ -222,11 +222,11 @@ export function resolveDepNode({
     storeValToComponentNode?.get(target) ||
     // target 是當前 component 的 inject 值；per-component 區域 Map，不污染全域 valNodeMap
     injectRawToLocalNode.get(target) ||
-    // target 就是響應式物件本身（ref / reactive / computed / pinia store 內部值）
+    // target 就是響應式物件本身（ref / reactive / computedImpl / pinia store 內部值）
     valNodeMap.get(target) ||
     // Pinia store fallback：target 是 rawStore，改用 rawSetupState[depName] 查 valNodeMap
-    (stateVal && typeof stateVal === "object"
-      ? valNodeMap.get(stateVal as object)
+    (setupStateVal && typeof setupStateVal === "object"
+      ? valNodeMap.get(setupStateVal as object)
       : undefined) ||
     // target 是 raw props object；prop 值可能是 primitive 無法當 WeakMap key，所以另開兩層結構
     propKeyNodeMap.get(target)?.get(String(key))
@@ -242,7 +242,7 @@ interface BindSetupTrackParams {
   storeValToComponentNode: Map<object, GraphNode>;
 }
 
-// Phase 2: 設 onTrack + 觸發 computed
+// Phase 2: 設 onTrack + 觸發 computedImpl
 export function bindSetupTrack({
   rawSetupState,
   componentName,
@@ -253,18 +253,18 @@ export function bindSetupTrack({
 }: BindSetupTrackParams): void {
   for (const key in rawSetupState) {
     const val = rawSetupState[key];
-    const computed = val as ComputedRefImpl
+    const computedImpl = val as ComputedRefImpl
 
-    if (computed?.effect) {
-      const subNode = valNodeMap.get(computed as object);
+    if (computedImpl?.effect) {
+      const subNode = valNodeMap.get(computedImpl as object);
       if (!subNode || subNode.type === "store") continue;
 
-      computed.onTrack = (event: TrackEvent) => {
-        const subNode = valNodeMap.get(computed as object)!;
+      computedImpl.onTrack = (event: OnTrackEvent) => {
+        const subNode = valNodeMap.get(computedImpl as object)!;
         if (!subNode) return;
 
-        // storeToRefs wrapper computed 執行時會先存取 storeProxy 再存取 internal computed
-        // storeProxy 本身不是我們追蹤的節點，直接跳過，避免 stateVal 反查到自己
+        // storeToRefs wrapper computedImpl 執行時會先存取 storeProxy 再存取 internal computedImpl
+        // storeProxy 本身不是我們追蹤的節點，直接跳過，避免 setupStateVal 反查到自己
         // if (isPiniaStoreProxy(event.target as object)) return;
 
         const depName = resolveDepName(
@@ -301,7 +301,7 @@ export function bindSetupTrack({
         notifyUpdate();
       };
 
-      forceComputedEval(computed);
+      markComputedDirtyAndEval(computedImpl);
     }
   }
 }

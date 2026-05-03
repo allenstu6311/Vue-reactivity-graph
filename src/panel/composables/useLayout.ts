@@ -11,14 +11,8 @@ export function buildLayout(
   const focused = allNodes.find(n => n.id === selectedId)
   if (!focused) return { nodes: [], edges: [] }
 
-  const compPrefix = selectedId.split('.').slice(0, -1).join('.')
-  // deps/subs 存的可能是短名（"price"）或完整 id（"App.ElTable.data"），先直查，找不到再用所在元件的 prefix 補全
-  function findNode(nameOrId: string, contextNodeId?: string): GraphNode | undefined {
-    const prefix = contextNodeId
-      ? contextNodeId.split('.').slice(0, -1).join('.')
-      : compPrefix
+  function findNode(nameOrId: string): GraphNode | undefined {
     return allNodes.find(n => n.id === nameOrId)
-      ?? allNodes.find(n => n.id === `${prefix}.${nameOrId}`)
   }
 
   const depNodes = (focused.deps ?? []).map(d => findNode(d)).filter(Boolean) as GraphNode[]
@@ -36,7 +30,7 @@ export function buildLayout(
   while (upQueue.length > 0) {
     const node = upQueue.shift()!
     for (const depName of node.deps ?? []) {
-      const dep = findNode(depName, node.id)
+      const dep = findNode(depName)
       if (!dep) continue
       upstreamEdges.push([dep.id, node.id])
       if (!seen.has(dep.id)) {
@@ -54,7 +48,7 @@ export function buildLayout(
   while (queue.length > 0) {
     const node = queue.shift()!
     for (const subName of node.subs ?? []) {
-      const sub = findNode(subName, node.id)
+      const sub = findNode(subName)
       if (!sub) continue
       downstreamEdges.push([node.id, sub.id])
       if (!seen.has(sub.id)) {
