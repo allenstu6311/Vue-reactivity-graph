@@ -11,10 +11,8 @@ import {
   collectSetupState,
   collectPiniaState,
   bindSetupTrack,
-  resolveDepNode,
-  resolveDepName,
-  isStoreToRefsRef,
 } from "./tracker";
+import { resolveDepNode, resolveDepName, isStoreToRefsRef } from "./helper/resolve";
 import { GraphNode, updateGraph, getGraph, notifyUpdate } from "../graph";
 
 // WeakMap：避免把 __node reference 直接掛在 Vue 物件上造成循環引用

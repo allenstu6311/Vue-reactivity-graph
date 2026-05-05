@@ -6,6 +6,9 @@ import type {
   ReactiveTarget,
   PiniaInstance,
 } from "../types/vue-internals";
+import { buildNode, setValNode } from "./helper/nodes";
+import { isStoreToRefsRef, isPiniaStoreProxy, resolveDepName, resolveDepNode } from "./helper/resolve";
+import type { CollectSetupStateParams, BindSetupTrackParams } from "./helper/types";
 
 function markComputedDirtyAndEval(val: ComputedRefImpl): void {
   val.flags |= 1 << 4;
@@ -14,85 +17,6 @@ function markComputedDirtyAndEval(val: ComputedRefImpl): void {
   val.value;
 }
 
-function isPiniaStoreProxy(val: unknown): boolean {
-  return (
-    typeof (val as any)?.$id === "string" &&
-    typeof (val as any)?.$patch === "function"
-  );
-}
-
-// storeToRefs 產生的 ObjectRefImpl：_key 是屬性名，_object 是 store proxy
-export function isStoreToRefsRef(val: unknown): boolean {
-  return (
-    (val as any)?._key !== undefined && isPiniaStoreProxy((val as any)?._object)
-  );
-}
-
-function buildNode(
-  key: string,
-  val: ReactiveTarget,
-  componentName: string,
-  file: string,
-): GraphNode | null {
-  const id = `${componentName}.${key}`;
-
-  if (val?.effect) {
-    return {
-      id,
-      varName: key,
-      type: "computed",
-      val,
-      file,
-      deps: [],
-      subs: [],
-    };
-  }
-
-  if (val?.__v_isRef) {
-    return { id, varName: key, type: "ref", val, file, deps: [], subs: [] };
-  }
-
-  if (val?.setup) {
-    return {
-      id,
-      varName: key,
-      type: "component",
-      val,
-      file,
-      deps: [],
-      subs: [],
-    };
-  }
-
-  if (val.__v_isReactive) {
-    const snapshot = Object.fromEntries(
-      Object.entries(val as unknown as Record<string, unknown>).filter(
-        ([k]) => !k.startsWith("__v_"),
-      ),
-    );
-
-    return {
-      id,
-      varName: key,
-      type: "reactive",
-      val: snapshot,
-      file,
-      deps: [],
-      subs: [],
-    };
-  }
-  return null;
-}
-
-interface CollectSetupStateParams {
-  rawSetupState: Data;
-  componentName: string;
-  file: string;
-  nodes: GraphNode[];
-  valNodeMap: WeakMap<object, GraphNode>;
-  skipKeys?: Set<string>;
-  storeValToComponentNode: Map<object, GraphNode>;
-}
 
 // Phase 1: 建 node、存 valNodeMap
 export function collectSetupState({
@@ -139,10 +63,7 @@ export function collectSetupState({
 
     const node = buildNode(key, trackedVal, componentName, file);
     if (node) {
-      valNodeMap.set(trackedVal, node);
-      // reactive proxy 的 onTrack event.target 是 raw object（非 proxy），需同時存 raw key
-      const rawTarget = (trackedVal as any).__v_raw as object | undefined;
-      if (rawTarget) valNodeMap.set(rawTarget, node);
+      setValNode(valNodeMap, trackedVal, node);
       nodes.push(node);
     }
   }
@@ -170,77 +91,15 @@ export function collectPiniaState(
         deps: [],
         subs: [],
       };
-      valNodeMap.set(val, node);
-      const rawVal = (val as any).__v_raw as object | undefined;
-      if (rawVal) valNodeMap.set(rawVal, node);
+      setValNode(valNodeMap, val, node);
       nodes.push(node);
     }
   });
 }
 
-export function resolveDepName(
-  target: object,
-  key: string | symbol,
-  propKeyNodeMap: WeakMap<object, Map<string, GraphNode>>,
-  valNodeMap: WeakMap<object, GraphNode>,
-): string | undefined {
-  return (
-    (isPiniaStoreProxy(target) ? String(key) : undefined) ??
-    valNodeMap.get(target)?.varName ??
-    (propKeyNodeMap.has(target) ? String(key) : undefined)
-  );
-}
 
-interface ResolveDepNodeParams {
-  target: object;
-  key: string | symbol;
-  depName: string | undefined;
-  rawSetupState: object | undefined;
-  valNodeMap: WeakMap<object, GraphNode>;
-  propKeyNodeMap: WeakMap<object, Map<string, GraphNode>>;
-  injectRawToLocalNode: Map<object, GraphNode>;
-  storeValToComponentNode?: Map<object, GraphNode>;
-}
 
-export function resolveDepNode({
-  target,
-  key,
-  depName,
-  rawSetupState,
-  valNodeMap,
-  propKeyNodeMap,
-  injectRawToLocalNode,
-  storeValToComponentNode,
-}: ResolveDepNodeParams): GraphNode | undefined {
-  const setupStateVal =
-    depName && rawSetupState
-      ? (rawSetupState as Record<string, unknown>)[depName]
-      : undefined;
 
-  return (
-    // storeToRefs ref/reactive wrapper：store 底層值 → component node（優先於 valNodeMap 的 store node）
-    storeValToComponentNode?.get(target) ||
-    // target 是當前 component 的 inject 值；per-component 區域 Map，不污染全域 valNodeMap
-    injectRawToLocalNode.get(target) ||
-    // target 就是響應式物件本身（ref / reactive / computedImpl / pinia store 內部值）
-    valNodeMap.get(target) ||
-    // Pinia store fallback：target 是 rawStore，改用 rawSetupState[depName] 查 valNodeMap
-    (setupStateVal && typeof setupStateVal === "object"
-      ? valNodeMap.get(setupStateVal as object)
-      : undefined) ||
-    // target 是 raw props object；prop 值可能是 primitive 無法當 WeakMap key，所以另開兩層結構
-    propKeyNodeMap.get(target)?.get(String(key))
-  );
-}
-
-interface BindSetupTrackParams {
-  rawSetupState: Data;
-  componentName: string;
-  valNodeMap: WeakMap<object, GraphNode>;
-  propKeyNodeMap: WeakMap<object, Map<string, GraphNode>>;
-  injectRawToLocalNode: Map<object, GraphNode>;
-  storeValToComponentNode: Map<object, GraphNode>;
-}
 
 // Phase 2: 設 onTrack + 觸發 computedImpl
 export function bindSetupTrack({
