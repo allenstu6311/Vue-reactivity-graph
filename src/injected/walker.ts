@@ -14,48 +14,7 @@ import {
 } from "./tracker";
 import { resolveDepNode, resolveDepName, isStoreToRefsRef } from "./helper/resolve";
 import { GraphNode, updateGraph, getGraph, notifyUpdate } from "../graph";
-
-// WeakMap：避免把 __node reference 直接掛在 Vue 物件上造成循環引用
-const valNodeMap = new WeakMap<object, GraphNode>();
-// WeakMap：props raw object → Map<propKey, GraphNode>
-const propKeyNodeMap = new WeakMap<object, Map<string, GraphNode>>();
-// WeakMap：inject raw → injectNode，專供 Phase 1 prop 來源解析使用
-// 父層寫入後，子層 prop 連結時反查
-const propSourceInjectMap = new WeakMap<object, GraphNode>();
-
-const hmrOverrideMap = new Map<string, ExtendedComponentInstance>();
-
-// 記錄每個 componentName 出現的次數，用於同名 component 多實例時產生唯一 graph key
-const componentKeyCountMap = new Map<string, number>();
-
-// parent sentinel dry-run 建立的 childType → { maps, nextIndex } 對應
-// maps 按 vnode 出現順序存 propMap，nextIndex 追蹤下一個子 instance 該取第幾個
-const instanceChildPropKeyMap = new WeakMap<
-  object,
-  Map<object, { maps: Map<string, string>[]; nextIndex: number }>
->();
-
-export function resetComponentKeyCounts(): void {
-  componentKeyCountMap.clear();
-}
-
-export function setHmrOverride(
-  id: string,
-  instance: ExtendedComponentInstance,
-): void {
-  hmrOverrideMap.set(id, instance);
-}
-
-export function deleteHmrOverride(id: string): void {
-  hmrOverrideMap.delete(id);
-}
-
-function resolveInstance(
-  instance: ExtendedComponentInstance,
-): ExtendedComponentInstance {
-  const hmrId = (instance?.type as any)?.__hmrId;
-  return hmrId && hmrOverrideMap.has(hmrId) ? hmrOverrideMap.get(hmrId)! : instance;
-}
+import { WalkContext, extractInstanceData } from "./context/WalkContext";
 
 // 對齊 Vue 的 resolveAsset 邏輯：exact → camelCase → PascalCase
 function resolveGlobalComponent(
@@ -180,33 +139,26 @@ function traverseVNodeForSentinels(
 }
 
 // Phase 1: 蒐集所有節點，不觸發任何訂閱者
-export function collectInstance(
-  rawInstance: ExtendedComponentInstance,
-  parentComponentName?: string,
-): void {
-  const instance = resolveInstance(rawInstance);
+export function collectInstance({
+  rawInstance,
+  parentComponentName,
+  ctx,
+}: {
+  rawInstance: ExtendedComponentInstance
+  parentComponentName?: string
+  ctx: WalkContext
+}): void {
 
-  const file =
-    ((instance.type as Record<string, unknown>).__name as string) ||
-    ((instance.type as Record<string, unknown>).name as string) ||
-    "Anonymous";
+  const instance = ctx.resolveInstance(rawInstance);
 
-  const undeduplicatedName = parentComponentName
-    ? `${parentComponentName}.${file}`
-    : file;
-
-  // 子組件重用
-  const count = componentKeyCountMap.get(undeduplicatedName) ?? 0;
-  componentKeyCountMap.set(undeduplicatedName, count + 1);
-  const componentName =
-    count === 0 ? undeduplicatedName : `${undeduplicatedName}_${count}`;
-
-  const nodes: GraphNode[] = [];
-
-  const rawSetupState = instance.setupState?.["__v_raw"] || {};
+  const { file, rawSetupState, watchEffects } = extractInstanceData(instance);
   const parentRawSetupState = instance.parent?.setupState?.["__v_raw"];
   // instance.propsOptions = [props定義物件, Vue內部轉型列表]，取 [0] 遍歷所有 prop 名稱
   const propsOptions = instance.propsOptions?.[0];
+
+  const componentName = ctx.resolveComponentName(parentComponentName, file);
+
+  const nodes: GraphNode[] = [];
 
   // Props 追蹤：建 prop nodes + 存進 propKeyNodeMap
   if (propsOptions) {
@@ -217,10 +169,10 @@ export function collectInstance(
     const propMap = new Map<string, GraphNode>();
     // computed/watch 的 onTrack event.target 是 raw props object，不在 valNodeMap 裡
     // 因此另開 propKeyNodeMap，讓 onTrack 能從 props raw object 查到對應的 prop node
-    propKeyNodeMap.set(rawPropsObj, propMap);
+    ctx.propKeyNodeMap.set(rawPropsObj, propMap);
 
     const parentSentinelResult = instance.parent
-      ? instanceChildPropKeyMap.get(instance.parent)
+      ? ctx.instanceChildPropKeyMap.get(instance.parent)
       : undefined;
 
     const siblingPropMaps = parentSentinelResult?.get(
@@ -256,14 +208,14 @@ export function collectInstance(
           const parentPropKey = sourceKey.slice(6);
           const parentRawPropsObj = (instance.parent.props.__v_raw ??
             instance.parent.props) as object;
-          parentNode = propKeyNodeMap
+          parentNode = ctx.propKeyNodeMap
             .get(parentRawPropsObj)
             ?.get(parentPropKey);
         } else if (parentRawSetupState) {
           const sourceRaw = parentRawSetupState[sourceKey];
           if (sourceRaw)
             parentNode =
-              propSourceInjectMap.get(sourceRaw) ?? valNodeMap.get(sourceRaw);
+              ctx.propSourceInjectMap.get(sourceRaw) ?? ctx.valNodeMap.get(sourceRaw);
         }
       }
 
@@ -298,8 +250,8 @@ export function collectInstance(
       const raw = (val as any).__v_raw;
       const lookupKey = (raw && typeof raw === "object" ? raw : val) as object;
       let parentNode =
-        (raw && typeof raw === "object" ? valNodeMap.get(raw as object) : undefined) ??
-        valNodeMap.get(val as object);
+        (raw && typeof raw === "object" ? ctx.valNodeMap.get(raw as object) : undefined) ??
+        ctx.valNodeMap.get(val as object);
 
       if (!parentNode) {
         const keyStr =
@@ -316,7 +268,7 @@ export function collectInstance(
           subs: [],
         };
         getGraph()[parentComponentName!]?.push(parentNode);
-        valNodeMap.set(lookupKey, parentNode);
+        ctx.valNodeMap.set(lookupKey, parentNode);
       }
 
       provideRawToNode.set(val as object, parentNode);
@@ -346,13 +298,13 @@ export function collectInstance(
         // 不覆寫 valNodeMap，避免兄弟元件處理時互蓋
         // 寫入 propSourceInjectMap，讓子層 prop 連結能查到此 inject node（深度優先保證父層先寫）
         const injectRaw = (val as any).__v_raw ?? val;
-        propSourceInjectMap.set(injectRaw as object, injectNode);
+        ctx.propSourceInjectMap.set(injectRaw as object, injectNode);
       }
     }
   }
 
   const pinia = instance.appContext.app.config.globalProperties.$pinia as PiniaInstance;
-  collectPiniaState(pinia, nodes, valNodeMap);
+  collectPiniaState(pinia, nodes, ctx.valNodeMap);
 
   // per-component：store 底層值 → component node（storeToRefs ref/reactive）
   // 與 injectRawToLocalNode 同理，每個 component 獨立建立，避免兄弟 component 互蓋
@@ -364,19 +316,13 @@ export function collectInstance(
       componentName,
       file,
       nodes,
-      valNodeMap,
+      valNodeMap: ctx.valNodeMap,
       skipKeys: injectKeySet,
       storeValToComponentNode,
     });
   }
 
   // 建 watch nodes（不觸發 effect）
-  //instance.scope.effects 包含 render effect 與所有 watch effect
-  // instance.effect 是 component 的 render effect，需要排除，只保留 watch
-  const watchEffects = instance.scope?.effects.filter(
-    (e) => e !== instance.effect,
-  );
-
   if (watchEffects && watchEffects.length > 0) {
     watchEffects.forEach((_effect: WatchEffect, index: number) => {
       nodes.push({
@@ -482,51 +428,57 @@ export function collectInstance(
       );
 
       if (dryRunChildPropMap.size > 0) {
-        instanceChildPropKeyMap.set(instance, dryRunChildPropMap);
+        ctx.instanceChildPropKeyMap.set(instance, dryRunChildPropMap);
       }
     }
   }
 
   updateGraph(componentName, nodes);
-  collectVNode(instance.subTree, componentName);
+  collectVNode({ vnode: instance.subTree, parentComponentName: componentName, ctx });
 }
 
-export function collectVNode(vnode: VNode, parentComponentName?: string): void {
+export function collectVNode({
+  vnode,
+  parentComponentName,
+  ctx,
+}: {
+  vnode: VNode
+  parentComponentName?: string
+  ctx: WalkContext
+}): void {
   if (!vnode) return;
   if (vnode.component) {
-    collectInstance(
-      vnode.component as ExtendedComponentInstance,
+    collectInstance({
+      rawInstance: vnode.component as ExtendedComponentInstance,
       parentComponentName,
-    );
+      ctx,
+    });
   }
   if (Array.isArray(vnode.children)) {
     vnode.children.forEach((child) => {
       if (child && typeof child === "object")
-        collectVNode(child as VNode, parentComponentName);
+        collectVNode({ vnode: child as VNode, parentComponentName, ctx });
     });
   }
 }
 
 // Phase 2: 觸發所有訂閱者，此時所有 node 已蒐集完畢
-export function triggerInstance(
-  rawInstance: ExtendedComponentInstance,
-  parentComponentName?: string,
-): void {
-  const instance = resolveInstance(rawInstance);
-  const file =
-    ((instance.type as Record<string, unknown>).__name as string) ||
-    ((instance.type as Record<string, unknown>).name as string) ||
-    "Anonymous";
+export function triggerInstance({
+  rawInstance,
+  parentComponentName,
+  ctx,
+}: {
+  rawInstance: ExtendedComponentInstance
+  parentComponentName?: string
+  ctx: WalkContext
+}): void {
 
-  const undeduplicatedName = parentComponentName
-    ? `${parentComponentName}.${file}`
-    : file;
-  const count = componentKeyCountMap.get(undeduplicatedName) ?? 0;
-  componentKeyCountMap.set(undeduplicatedName, count + 1);
-  const componentName =
-    count === 0 ? undeduplicatedName : `${undeduplicatedName}_${count}`;
+  const instance = ctx.resolveInstance(rawInstance);
 
-  const rawSetupState = instance.setupState?.["__v_raw"] || {};
+  const { file, rawSetupState, watchEffects } = extractInstanceData(instance);
+
+  const componentName = ctx.resolveComponentName(parentComponentName, file);
+
   const nodes = getGraph()[componentName] ?? [];
 
   // per-component inject lookup：raw → injectNode，供 Phase 2 onTrack resolveDepNode 使用
@@ -551,7 +503,7 @@ export function triggerInstance(
     if (!isStoreToRefsRef(val)) continue;
     const storeRaw = (val as any)._object?.__v_raw ?? (val as any)._object;
     const storeVal = storeRaw?.[(val as any)._key];
-    const componentNode = valNodeMap.get(val as object);
+    const componentNode = ctx.valNodeMap.get(val as object);
     if (storeVal && typeof storeVal === "object" && componentNode) {
       storeValToComponentNode.set(storeVal as object, componentNode);
     }
@@ -560,16 +512,12 @@ export function triggerInstance(
     bindSetupTrack({
       rawSetupState,
       componentName,
-      valNodeMap,
-      propKeyNodeMap,
+      valNodeMap: ctx.valNodeMap,
+      propKeyNodeMap: ctx.propKeyNodeMap,
       injectRawToLocalNode,
       storeValToComponentNode,
     });
   }
-
-  const watchEffects = instance.scope?.effects.filter(
-    (e) => e !== instance.effect,
-  );
 
   if (watchEffects && watchEffects.length > 0) {
     watchEffects.forEach((effect: WatchEffect, index: number) => {
@@ -585,8 +533,8 @@ export function triggerInstance(
         const depName = resolveDepName(
           event.target as object,
           event.key,
-          propKeyNodeMap,
-          valNodeMap,
+          ctx.propKeyNodeMap,
+          ctx.valNodeMap,
         );
         if (!depName) return;
 
@@ -595,8 +543,8 @@ export function triggerInstance(
           key: event.key,
           depName,
           rawSetupState,
-          valNodeMap,
-          propKeyNodeMap,
+          valNodeMap: ctx.valNodeMap,
+          propKeyNodeMap: ctx.propKeyNodeMap,
           injectRawToLocalNode,
           storeValToComponentNode,
         });
@@ -614,21 +562,30 @@ export function triggerInstance(
     });
   }
 
-  triggerVNode(instance.subTree, componentName);
+  triggerVNode({ vnode: instance.subTree, parentComponentName: componentName, ctx });
 }
 
-export function triggerVNode(vnode: VNode, parentComponentName?: string): void {
+export function triggerVNode({
+  vnode,
+  parentComponentName,
+  ctx,
+}: {
+  vnode: VNode
+  parentComponentName?: string
+  ctx: WalkContext
+}): void {
   if (!vnode) return;
   if (vnode.component) {
-    triggerInstance(
-      vnode.component as ExtendedComponentInstance,
+    triggerInstance({
+      rawInstance: vnode.component as ExtendedComponentInstance,
       parentComponentName,
-    );
+      ctx,
+    });
   }
   if (Array.isArray(vnode.children)) {
     vnode.children.forEach((child) => {
       if (child && typeof child === "object")
-        triggerVNode(child as VNode, parentComponentName);
+        triggerVNode({ vnode: child as VNode, parentComponentName, ctx });
     });
   }
 }

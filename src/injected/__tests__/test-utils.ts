@@ -4,7 +4,8 @@
 // 導致 storeToRefs ObjectRefImpl 的 onTrack 無法觸發，watch 節點也無法被偵測。
 import { createRenderer } from 'vue'
 import type { ExtendedComponentInstance } from '../../types/vue-internals'
-import { resetComponentKeyCounts, collectInstance, triggerInstance } from '../walker'
+import { collectInstance, triggerInstance } from '../walker'
+import { WalkContext } from '../context/WalkContext'
 import { getGraph } from '../../graph'
 import type { ComponentGraph } from '../../graph'
 
@@ -34,7 +35,7 @@ function clearGraph(): void {
  * 建立 Vue app、執行 walker 完整流程（collect → trigger），回傳 graph 快照
  *
  * 流程與 injected/index.ts 一致：
- *   resetComponentKeyCounts → collectInstance → resetComponentKeyCounts → triggerInstance
+ *   resetCounts → collectInstance → resetCounts → triggerInstance
  */
 export function runWalker(rootComponent: any, plugins: any[] = []): ComponentGraph {
   clearGraph()
@@ -46,10 +47,11 @@ export function runWalker(rootComponent: any, plugins: any[] = []): ComponentGra
 
   const rootInstance = (app as any)._instance as ExtendedComponentInstance
 
-  resetComponentKeyCounts()
-  collectInstance(rootInstance)
-  resetComponentKeyCounts()
-  triggerInstance(rootInstance)
+  const ctx = new WalkContext()
+  ctx.resetCounts()
+  collectInstance({ rawInstance: rootInstance, ctx })
+  ctx.resetCounts()
+  triggerInstance({ rawInstance: rootInstance, ctx })
 
   // 回傳淺拷貝，避免後續測試汙染
   const g = getGraph()

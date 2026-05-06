@@ -1,10 +1,8 @@
 import {
   collectInstance,
   triggerInstance,
-  setHmrOverride,
-  deleteHmrOverride,
-  resetComponentKeyCounts,
 } from "./walker";
+import { WalkContext } from "./context/WalkContext";
 import type { ExtendedComponentInstance, HookComponentEventArgs, VueAppInternals } from "../types/vue-internals";
 import { getGraph, setOnUpdate } from "../graph";
 import type { NodeType } from "../graph";
@@ -20,6 +18,8 @@ const originalEmit = hook.emit.bind(hook);
 const pendingHmrIds = new Set<string>();
 
 if (app) {
+  const ctx = new WalkContext();
+
   function sanitizeVal(val: unknown, type: NodeType): unknown {
     switch (type) {
       case "ref":
@@ -78,12 +78,12 @@ if (app) {
       const hmrId: string | undefined = (instance?.type as any)?.__hmrId;
       if (hmrId && pendingHmrIds.has(hmrId)) {
         pendingHmrIds.delete(hmrId);
-        setHmrOverride(hmrId, instance);
-        resetComponentKeyCounts();
-        collectInstance(vueApp._instance);
-        resetComponentKeyCounts();
-        triggerInstance(vueApp._instance);
-        deleteHmrOverride(hmrId);
+        ctx.hmrOverrideMap.set(hmrId, instance);
+        ctx.resetCounts();
+        collectInstance({ rawInstance: vueApp._instance, ctx });
+        ctx.resetCounts();
+        triggerInstance({ rawInstance: vueApp._instance, ctx });
+        ctx.hmrOverrideMap.delete(hmrId);
         refreshGraph();
       }
     }
@@ -91,9 +91,9 @@ if (app) {
   };
 
   setOnUpdate(refreshGraph);
-  resetComponentKeyCounts();
-  collectInstance(app);
-  resetComponentKeyCounts();
-  triggerInstance(app);
+  ctx.resetCounts();
+  collectInstance({ rawInstance: app, ctx });
+  ctx.resetCounts();
+  triggerInstance({ rawInstance: app, ctx });
   refreshGraph();
 }
