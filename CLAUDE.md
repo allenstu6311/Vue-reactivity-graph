@@ -52,7 +52,12 @@
 |---|---|
 | `injected/index.ts` | 入口：取 `__vue_app__._instance`，掛 HMR hook，呼叫 walker |
 | `injected/walker.ts` | 核心：遍歷 component instance tree，sentinel dry-run 追蹤 prop 來源，建立 GraphNode[] |
-| `injected/tracker.ts` | 識別 ref/reactive/computed/watch，建 valNodeMap；resolveDepName / resolveDepNode |
+| `injected/context/WalkContext.ts` | WalkContext class：六個 walker-scoped map、`resolveComponentName`、`resolveInstance`、`resetCounts`；`extractInstanceData` 函數 |
+| `injected/context/types.ts` | `InstanceData` 介面 |
+| `injected/helper/nodes.ts` | `buildNode`、`setValNode`：GraphNode 建立與寫入 valNodeMap |
+| `injected/helper/resolve.ts` | `resolveDepName`、`resolveDepNode`、`isPiniaStoreProxy`、`isStoreToRefsRef` |
+| `injected/helper/types.ts` | 各函數參數介面：`CollectSetupStateParams`、`ResolveDepNodeParams`、`BindSetupTrackParams`、`BaseCollectParams` |
+| `injected/tracker.ts` | `collectSetupState`（建 valNodeMap）、`collectPiniaState`、`bindSetupTrack` |
 | `graph/types.ts` | 純型別：NodeType, GraphNode, ComponentGraph |
 | `graph/index.ts` | graph 全域狀態 + getGraph / updateGraph / notifyUpdate |
 | `types/vue-internals.d.ts` | Vue 未公開內部型別（ComputedRefImpl, ExtendedComponentInstance 等） |

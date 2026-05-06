@@ -39,8 +39,10 @@ model: sonnet
 - 若資訊不足，在最後補上 **Question** 區塊，列出需要確認的問題，不要自行假設
 - 先閱讀專案相關檔案，理解現有架構後再撰寫規格
 - 不要直接寫程式碼，這個階段只產出規格文件
-- 規格文件**一律寫入專案根目錄的 `spec.md`**，覆蓋舊內容
-- spec.md 寫完後，在文件末尾加上 `## 審閱建議` 區塊，指出應由哪個 Vue 領域代理人接手審閱。判斷依據：
+- **兩階段流程（必須遵守）**：
+  1. **預設**：分析完畢後，將完整規格草稿以 markdown 文字輸出到對話，**不寫入任何檔案**，末尾加上「請確認以上規格，確認後告知我寫入 spec.md。」
+  2. **寫入檔案**：只有當呼叫訊息明確包含「已確認，請寫入 spec.md」時，才將內容寫入根目錄 `spec.md`（覆蓋舊內容）
+- 在文件末尾加上 `## 審閱建議` 區塊，指出應由哪個 Vue 領域代理人接手審閱。判斷依據：
   - 涉及 props / sentinel dry-run / `propKeyNodeMap` → `vue-props-expert`
   - 涉及 `valNodeMap` / `collectSetupState` / ref/reactive/computed 識別 → `vue-setup-state-expert`
   - 涉及 `injectRawToNodeMap` / provide/inject 追蹤 → `vue-inject-expert`
