@@ -2,99 +2,15 @@ import { GraphNode, notifyUpdate } from "../graph";
 import type {
   ComputedRefImpl,
   OnTrackEvent,
-  Data,
-  ReactiveTarget,
-  PiniaInstance,
 } from "../types/vue-internals";
-import { buildNode, setValNode } from "./helper/nodes";
-import { isStoreToRefsRef, isPiniaStoreProxy, resolveDepName, resolveDepNode } from "./helper/resolve";
-import type { CollectSetupStateParams, BindSetupTrackParams } from "./helper/types";
+import { resolveDepName, resolveDepNode } from "./helper/resolve";
+import type { BindSetupTrackParams } from "./helper/types";
 
 function markComputedDirtyAndEval(val: ComputedRefImpl): void {
   val.flags |= 1 << 4;
   val.flags &= ~(1 << 7);
   val.globalVersion = -1;
   val.value;
-}
-
-
-// Phase 1: 建 node、存 valNodeMap
-export function collectSetupState({
-  rawSetupState,
-  componentName,
-  file,
-  nodes,
-  valNodeMap,
-  skipKeys,
-  storeValToComponentNode,
-}: CollectSetupStateParams): void {
-  for (const key in rawSetupState) {
-    if (key === "props") continue;
-    if (skipKeys?.has(key)) continue;
-    const val = rawSetupState[key];
-
-    if (typeof val !== "object" || val === null) continue;
-    if (isPiniaStoreProxy(val)) continue;
-    if (valNodeMap.has(val)) continue;
-    const trackedVal = val as ReactiveTarget
-
-    // storeToRefs ref/reactive wrapper（ObjectRefImpl）
-    // _object 是 store proxy，_key 是屬性名，透過這兩個靜態建立 component node 與 store node 的連結
-    if (isStoreToRefsRef(trackedVal)) {
-      const storeRaw = (trackedVal as any)._object?.__v_raw ?? (trackedVal as any)._object;
-      const storeKey = (trackedVal as any)._key;
-      const storeVal = storeRaw?.[storeKey];
-      const storeNode =
-        storeVal && typeof storeVal === "object"
-          ? valNodeMap.get(storeVal as object)
-          : undefined;
-
-      const componentNode = buildNode(key, trackedVal, componentName, file);
-      if (componentNode && storeNode) {
-        componentNode.deps.push(storeNode.id);
-        if (!storeNode.subs.includes(componentNode.id))
-          storeNode.subs.push(componentNode.id);
-        storeValToComponentNode.set(storeVal as object, componentNode);
-        valNodeMap.set(trackedVal, componentNode);
-        nodes.push(componentNode);
-      }
-      continue;
-    }
-
-    const node = buildNode(key, trackedVal, componentName, file);
-    if (node) {
-      setValNode(valNodeMap, trackedVal, node);
-      nodes.push(node);
-    }
-  }
-}
-
-export function collectPiniaState(
-  pinia: PiniaInstance,
-  nodes: GraphNode[],
-  valNodeMap: WeakMap<object, GraphNode>,
-): void {
-  if (!pinia?._s) return;
-  pinia._s.forEach((store) => {
-    const storeId: string = store.$id;
-    const raw = store.__v_raw ?? store;
-    for (const key in raw) {
-      if (key.startsWith("$") || key.startsWith("_")) continue;
-      const val = raw[key];
-      if (typeof val !== "object" || val === null) continue;
-      const node: GraphNode = {
-        id: `${storeId}.${key}`,
-        varName: key,
-        type: "store",
-        val,
-        file: storeId,
-        deps: [],
-        subs: [],
-      };
-      setValNode(valNodeMap, val, node);
-      nodes.push(node);
-    }
-  });
 }
 
 

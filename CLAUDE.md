@@ -57,7 +57,13 @@
 | `injected/helper/nodes.ts` | `buildNode`、`setValNode`：GraphNode 建立與寫入 valNodeMap |
 | `injected/helper/resolve.ts` | `resolveDepName`、`resolveDepNode`、`isPiniaStoreProxy`、`isStoreToRefsRef` |
 | `injected/helper/types.ts` | 各函數參數介面：`CollectSetupStateParams`、`ResolveDepNodeParams`、`BindSetupTrackParams`、`BaseCollectParams` |
-| `injected/tracker.ts` | `collectSetupState`（建 valNodeMap）、`collectPiniaState`、`bindSetupTrack` |
+| `injected/collect/types.ts` | collect 子模組的參數介面：`CollectPropsParams`、`CollectInjectParams`、`CollectSetupParams`、`CollectWatchParams`、`SentinelDryRunParams` |
+| `injected/collect/sentinel.ts` | `runSentinelDryRun`：sentinel dry-run 邏輯；`traverseVNodeForSentinels`、`resolveGlobalComponent` helper |
+| `injected/collect/props.ts` | `collectProps`：prop 節點建立與 Strategy 1/2 來源連結 |
+| `injected/collect/inject.ts` | `collectInject`：inject 偵測與 inject node 建立（回傳 injectKeySet） |
+| `injected/collect/setup.ts` | `collectSetup`、`collectPiniaState`：搬自 tracker.ts，Phase 1 節點蒐集 |
+| `injected/collect/watch.ts` | `collectWatch`：watch 節點建立 |
+| `injected/tracker.ts` | `bindSetupTrack`、`markComputedDirtyAndEval` |
 | `graph/types.ts` | 純型別：NodeType, GraphNode, ComponentGraph |
 | `graph/index.ts` | graph 全域狀態 + getGraph / updateGraph / notifyUpdate |
 | `types/vue-internals.d.ts` | Vue 未公開內部型別（ComputedRefImpl, ExtendedComponentInstance 等） |
