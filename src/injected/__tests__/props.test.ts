@@ -88,8 +88,8 @@ const DupParent = defineComponent({
 describe('Phase 3 — Props 基礎傳遞', () => {
   it('ref → prop（同名）：prop node 連回父層 ref', () => {
     const graph = runWalker(SameNameParent)
-    const parent = graph['SameNameParent']
-    const child = graph['SameNameParent.SameNameChild']
+    const parent = graph.components['SameNameParent']
+    const child = graph.components['SameNameParent.SameNameChild']
 
     expect(parent).toBeDefined()
     expect(child).toBeDefined()
@@ -116,8 +116,8 @@ describe('Phase 3 — Props 基礎傳遞', () => {
 
   it('ref → prop（異名）：prop node 連回父層 ref（sentinel dry-run）', () => {
     const graph = runWalker(RenamedParent)
-    const parent = graph['RenamedParent']
-    const child = graph['RenamedParent.RenamedChild']
+    const parent = graph.components['RenamedParent']
+    const child = graph.components['RenamedParent.RenamedChild']
 
     expect(parent).toBeDefined()
     expect(child).toBeDefined()
@@ -144,8 +144,8 @@ describe('Phase 3 — Props 基礎傳遞', () => {
 
   it('computed → prop：prop node 連回父層 computed', () => {
     const graph = runWalker(ComputedParent)
-    const parent = graph['ComputedParent']
-    const child = graph['ComputedParent.ComputedChild']
+    const parent = graph.components['ComputedParent']
+    const child = graph.components['ComputedParent.ComputedChild']
 
     expect(parent).toBeDefined()
     expect(child).toBeDefined()
@@ -196,12 +196,12 @@ describe('Phase 3 — Props 基礎傳遞', () => {
     const graph = runWalker(PropGrandParent)
 
     // 第一層（ref → prop）：sentinel 覆蓋 setupState，能追蹤 ✓
-    const parentCount = graph['PropGrandParent.PropParent']?.find(n => n.varName === 'count')!
+    const parentCount = graph.components['PropGrandParent.PropParent']?.find(n => n.varName === 'count')!
     expect(parentCount.deps).toStrictEqual(['PropGrandParent.count'])
 
     // 第二層（prop → prop）：PropParent.count 在 instance.props
     // sentinel dry-run 同樣覆蓋 props，能追蹤 PropParent.count → PropChild.value ✓
-    const childValue = graph['PropGrandParent.PropParent.PropChild']?.find(n => n.varName === 'value')!
+    const childValue = graph.components['PropGrandParent.PropParent.PropChild']?.find(n => n.varName === 'value')!
     expect(pick(childValue)).toStrictEqual({
       id: 'PropGrandParent.PropParent.PropChild.value',
       varName: 'value',
@@ -241,7 +241,7 @@ describe('Phase 3 — Props 基礎傳遞', () => {
 
     it('reactive 包裹：prop node 的 deps 包含來源 ref 的 id', () => {
       const graph = runWalker(VBindParentReactive)
-      const child = graph['VBindParentReactive.VBindChildReactive']
+      const child = graph.components['VBindParentReactive.VBindChildReactive']
 
       expect(child).toBeDefined()
       const textProp = child.find(n => n.varName === 'text')!
@@ -251,7 +251,7 @@ describe('Phase 3 — Props 基礎傳遞', () => {
 
     it('reactive 包裹：來源 ref 的 subs 包含 prop node 的 id', () => {
       const graph = runWalker(VBindParentReactive)
-      const parent = graph['VBindParentReactive']
+      const parent = graph.components['VBindParentReactive']
 
       const numNode = parent.find(n => n.varName === 'num')!
       expect(numNode).toBeDefined()
@@ -281,7 +281,7 @@ describe('Phase 3 — Props 基礎傳遞', () => {
 
     it('純物件包裹（非 reactive）：prop node 的 deps 包含來源 ref 的 id', () => {
       const graph = runWalker(VBindParentPlain)
-      const child = graph['VBindParentPlain.VBindChildPlain']
+      const child = graph.components['VBindParentPlain.VBindChildPlain']
 
       expect(child).toBeDefined()
       const textProp = child.find(n => n.varName === 'text')!
@@ -291,7 +291,7 @@ describe('Phase 3 — Props 基礎傳遞', () => {
 
     it('純物件包裹（非 reactive）：來源 ref 的 subs 包含 prop node 的 id', () => {
       const graph = runWalker(VBindParentPlain)
-      const parent = graph['VBindParentPlain']
+      const parent = graph.components['VBindParentPlain']
 
       const numNode = parent.find(n => n.varName === 'num')!
       expect(numNode).toBeDefined()
@@ -358,8 +358,8 @@ describe('Phase 3 — Props 基礎傳遞', () => {
 
     it('Branch A 與 Branch B 並存：v-bind 展開的 prop 和具名 prop 都能正確追蹤', () => {
       const graph = runWalker(VBindParentMixed)
-      const parent = graph['VBindParentMixed']
-      const child = graph['VBindParentMixed.VBindChildMixed']
+      const parent = graph.components['VBindParentMixed']
+      const child = graph.components['VBindParentMixed.VBindChildMixed']
 
       expect(child).toBeDefined()
 
@@ -378,9 +378,9 @@ describe('Phase 3 — Props 基礎傳遞', () => {
 
   it('同名 component 使用兩次時命名去重，prop 各自連回正確的父層 ref', () => {
     const graph = runWalker(DupParent)
-    const parent = graph['DupParent']
-    const child0 = graph['DupParent.DupChild']
-    const child1 = graph['DupParent.DupChild_1']
+    const parent = graph.components['DupParent']
+    const child0 = graph.components['DupParent.DupChild']
+    const child1 = graph.components['DupParent.DupChild_1']
 
     expect(child0).toBeDefined()
     expect(child1).toBeDefined()

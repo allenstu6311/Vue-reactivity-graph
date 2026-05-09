@@ -41,12 +41,18 @@ function pick(node: GraphNode) {
 describe('Phase 2 — Pinia Store 追蹤', () => {
   it('建立正確數量的節點並連線 deps / subs', () => {
     const graph = runWalker(TestComp, [createPinia()])
-    const nodes = graph['TestComp']
-    expect(nodes).toBeDefined()
-    // 3 store nodes（test.count / test.items / test.double）+ 7 component nodes
-    expect(nodes).toHaveLength(10)
 
-    const get = (id: string) => nodes.find(n => n.id === id)!
+    const compNodes = graph.components['TestComp']
+    const storeNodes = graph.stores['test']
+
+    expect(compNodes).toBeDefined()
+    expect(storeNodes).toBeDefined()
+    // 7 component nodes（storeToRefs wrappers + computed + watch）
+    expect(compNodes).toHaveLength(7)
+    // 3 store nodes（test.count / test.items / test.double）
+    expect(storeNodes).toHaveLength(3)
+
+    const get = (id: string) => compNodes.find(n => n.id === id)!
 
     // storeToRefs ref wrapper：count
     // ref 透過 auto-unwrap 觸發兩次 onTrack，storeValToComponentNode 正確攔截
@@ -118,11 +124,11 @@ describe('Phase 2 — Pinia Store 追蹤', () => {
 
   it('store 節點的 subs 正確指向 component wrapper 節點', () => {
     const graph = runWalker(TestComp, [createPinia()])
-    // store nodes 與 component nodes 同屬 graph['TestComp']
-    const nodes = graph['TestComp']
-    expect(nodes).toBeDefined()
+    const storeNodes = graph.stores['test']
 
-    const get = (id: string) => nodes.find(n => n.id === id)!
+    expect(storeNodes).toBeDefined()
+
+    const get = (id: string) => storeNodes.find(n => n.id === id)!
 
     // ref：Phase 1 靜態建立連結
     expect(get('test.count').subs).toStrictEqual(['TestComp.count'])

@@ -10,4 +10,7 @@ export interface GraphNode {
   subs: string[]  // 訂閱者節點的完整 id（`componentName.varName` 格式），ref / reactive / computed 有
 }
 
-export type ComponentGraph = Record<string, GraphNode[]>
+export interface GraphData {
+  components: Record<string, GraphNode[]>
+  stores: Record<string, GraphNode[]>
+}

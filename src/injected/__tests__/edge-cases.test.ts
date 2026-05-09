@@ -77,7 +77,7 @@ const AnonProvider = defineComponent({
 describe('Edge Cases', () => {
   it('inject 無對應 provider：節點類型為 ref，deps 為空（inject node 不建立）', () => {
     const graph = runWalker(NoProviderParent)
-    const childNodes = graph['NoProviderParent.NoProviderChild']
+    const childNodes = graph.components['NoProviderParent.NoProviderChild']
     const countNode = childNodes.find(n => n.varName === 'count')
 
     expect(countNode?.type).toBe('ref')
@@ -87,7 +87,7 @@ describe('Edge Cases', () => {
   it('鏈式 re-provide A→B→C：C 直接連回 A，B 的 inject node subs 為空', () => {
     const graph = runWalker(ChainA)
     const get = (key: string, varName: string) =>
-      graph[key].find(n => n.varName === varName)!
+      graph.components[key].find(n => n.varName === varName)!
 
     expect(pick(get('ChainA', 'num'))).toStrictEqual({
       id: 'ChainA.num',
@@ -117,12 +117,12 @@ describe('Edge Cases', () => {
   it('provide 匿名 ref：建 anonymous node，子層 inject 連回父層', () => {
     const graph = runWalker(AnonProvider)
 
-    const parentNodes = graph['AnonProvider']
+    const parentNodes = graph.components['AnonProvider']
     const anonNode = parentNodes.find(n => n.varName === 'anonymous')
     expect(anonNode?.type).toBe('ref')
     expect(anonNode?.subs).toContain('AnonProvider.AnonReceiver.count')
 
-    const childNodes = graph['AnonProvider.AnonReceiver']
+    const childNodes = graph.components['AnonProvider.AnonReceiver']
     const countNode = childNodes.find(n => n.varName === 'count')
     expect(countNode?.type).toBe('inject')
     expect(countNode?.deps).toEqual(['AnonProvider.anonymous:count'])

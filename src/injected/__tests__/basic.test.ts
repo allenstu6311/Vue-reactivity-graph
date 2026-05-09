@@ -33,7 +33,7 @@ function pick(node: GraphNode) {
 describe('Phase 1 — 單一元件基礎驗證', () => {
   it('建立正確數量的節點並連線 deps / subs', () => {
     const graph = runWalker(TestComp)
-    const nodes = graph['TestComp']
+    const nodes = graph.components['TestComp']
     expect(nodes).toBeDefined()
     expect(nodes).toHaveLength(7)
 
@@ -115,10 +115,10 @@ describe('Phase 1 — 單一元件基礎驗證', () => {
     })
 
     const graph = runWalker(DupComp)
-    const sumTwice = graph['DupComp'].find(n => n.varName === 'sumTwice')!
+    const sumTwice = graph.components['DupComp'].find(n => n.varName === 'sumTwice')!
 
     expect(sumTwice.deps).toStrictEqual(['DupComp.count'])
-    expect(graph['DupComp'].find(n => n.varName === 'count')!.subs).toStrictEqual(['DupComp.sumTwice'])
+    expect(graph.components['DupComp'].find(n => n.varName === 'count')!.subs).toStrictEqual(['DupComp.sumTwice'])
   })
 
   it('無訂閱者的 ref，subs 為空陣列', () => {
@@ -132,7 +132,7 @@ describe('Phase 1 — 單一元件基礎驗證', () => {
     })
 
     const graph = runWalker(UnusedComp)
-    const unused = graph['UnusedComp'].find(n => n.varName === 'unused')!
+    const unused = graph.components['UnusedComp'].find(n => n.varName === 'unused')!
 
     expect(unused).toBeDefined()
     expect(unused.subs).toStrictEqual([])

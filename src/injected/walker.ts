@@ -6,7 +6,7 @@ import type {
 import { bindComputedTrack } from "./subscribers/computed";
 import { bindWatchTrack } from "./subscribers/watch";
 import { isStoreToRefsRef } from "./helper/resolve";
-import { GraphNode, updateGraph, getGraph } from "../graph";
+import { GraphNode, updateComponent, updateStore, getGraphData } from "../graph";
 import { WalkContext, extractInstanceData } from "./context/WalkContext";
 import { runSentinelDryRun } from "./collect/sentinel";
 import { collectProps } from "./collect/props";
@@ -40,11 +40,6 @@ export function collectInstance({
   // 3. collect inject（回傳 injectKeySet 供 setup 跳過同名 key）
   const injectKeys = collectInject({ instance, componentName, parentComponentName, file, nodes, ctx, rawSetupState });
 
-  // 4. collect pinia（維持現況，每個 component 都呼叫）
-  // 必須在 collectSetup 之前：storeToRefs 連結 store node 時需要 store node 已在 valNodeMap 中
-  const pinia = instance.appContext.app.config.globalProperties.$pinia as PiniaInstance;
-  collectPiniaState(pinia, nodes, ctx.valNodeMap);
-
   // 5. collect setup state（跳過 inject keys）
   const storeValToComponentNode = new Map<object, GraphNode>();
   collectSetup({ rawSetupState, componentName, file, nodes, valNodeMap: ctx.valNodeMap, skipKeys: injectKeys, storeValToComponentNode });
@@ -52,7 +47,7 @@ export function collectInstance({
   // 6. collect watch
   collectWatch({ instance, componentName, file, nodes, watchEffects });
 
-  updateGraph(componentName, nodes);
+  updateComponent(componentName, nodes);
   // DFS：遞迴處理子元件樹，確保 DFS 順序維持不變
   traverseVNode(instance.subTree, componentName, ctx, collectInstance);
 }
@@ -95,7 +90,7 @@ export function triggerInstance({
 
   const componentName = ctx.resolveComponentName(parentComponentName, file);
 
-  const nodes = getGraph()[componentName] ?? [];
+  const nodes = getGraphData().components[componentName] ?? [];
 
   // per-component inject lookup：raw → injectNode，供 Phase 2 onTrack resolveDepNode 使用
   // 每次 triggerInstance 重建：A、B 兩個兄弟 component 若 inject 同一個 provide 值（同一 raw object），
@@ -152,6 +147,14 @@ export function triggerInstance({
 }
 
 export function runScan(root: ExtendedComponentInstance, ctx: WalkContext): void {
+  const pinia = root.appContext?.app?.config?.globalProperties?.$pinia as PiniaInstance | undefined
+  if (pinia) {
+    const storeGroups = collectPiniaState(pinia, ctx.valNodeMap)
+    for (const [storeId, nodes] of Object.entries(storeGroups)) {
+      updateStore(storeId, nodes)
+    }
+  }
+
   // Phase 1: 建節點。reset 確保 componentName 計算從頭開始
   ctx.resetCounts()
   collectInstance({ rawInstance: root, ctx })

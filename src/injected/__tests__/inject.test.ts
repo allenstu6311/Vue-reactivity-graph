@@ -172,7 +172,7 @@ const WatchProvider = defineComponent({
 describe('Phase 4 — Provide / Inject', () => {
   it('inject ref：inject node 連回父層 ref，deps / subs 互連', () => {
     const graph = runWalker(ProviderComp)
-    const get = (key: string, varName: string) => graph[key].find(n => n.varName === varName)!
+    const get = (key: string, varName: string) => graph.components[key].find(n => n.varName === varName)!
 
     expect(pick(get('ProviderComp', 'num'))).toStrictEqual({
       id: 'ProviderComp.num',
@@ -193,7 +193,7 @@ describe('Phase 4 — Provide / Inject', () => {
 
   it('兩子元件 inject 同一 provide：各自建立獨立 inject node，父層 subs 包含兩者，不互蓋', () => {
     const graph = runWalker(SiblingProvider)
-    const get = (key: string, varName: string) => graph[key].find(n => n.varName === varName)!
+    const get = (key: string, varName: string) => graph.components[key].find(n => n.varName === varName)!
 
     expect(pick(get('SiblingProvider', 'val'))).toStrictEqual({
       id: 'SiblingProvider.val',
@@ -222,7 +222,7 @@ describe('Phase 4 — Provide / Inject', () => {
 
   it('inject 被 computed 讀取：computed.deps 包含 inject node id，inject node.subs 包含 computed node id', () => {
     const graph = runWalker(ComputedProvider)
-    const get = (key: string, varName: string) => graph[key].find(n => n.varName === varName)!
+    const get = (key: string, varName: string) => graph.components[key].find(n => n.varName === varName)!
 
     expect(pick(get('ComputedProvider.ComputedConsumer', 'base'))).toStrictEqual({
       id: 'ComputedProvider.ComputedConsumer.base',
@@ -243,7 +243,7 @@ describe('Phase 4 — Provide / Inject', () => {
 
   it('inject 被 watch 讀取：w_0.deps 包含 inject node id', () => {
     const graph = runWalker(WatchProvider)
-    const get = (key: string, varName: string) => graph[key].find(n => n.varName === varName)!
+    const get = (key: string, varName: string) => graph.components[key].find(n => n.varName === varName)!
 
     expect(pick(get('WatchProvider.WatchConsumer', 'count'))).toStrictEqual({
       id: 'WatchProvider.WatchConsumer.count',
@@ -264,7 +264,7 @@ describe('Phase 4 — Provide / Inject', () => {
 
   it('provide readonly(ref(...))：inject node 連回父層 ref，deps / subs 互連', () => {
     const graph = runWalker(ReadonlyProvider)
-    const get = (key: string, varName: string) => graph[key].find(n => n.varName === varName)!
+    const get = (key: string, varName: string) => graph.components[key].find(n => n.varName === varName)!
 
     expect(pick(get('ReadonlyProvider', 'count'))).toStrictEqual({
       id: 'ReadonlyProvider.count',
@@ -285,7 +285,7 @@ describe('Phase 4 — Provide / Inject', () => {
 
   it('Symbol key provide / inject：inject node 連回父層 ref，deps / subs 互連', () => {
     const graph = runWalker(SymbolProvider)
-    const get = (key: string, varName: string) => graph[key].find(n => n.varName === varName)!
+    const get = (key: string, varName: string) => graph.components[key].find(n => n.varName === varName)!
 
     expect(pick(get('SymbolProvider', 'count'))).toStrictEqual({
       id: 'SymbolProvider.count',
@@ -306,7 +306,7 @@ describe('Phase 4 — Provide / Inject', () => {
 
   it('provide reactive proxy：inject node 連回父層 reactive，deps / subs 互連', () => {
     const graph = runWalker(ReactiveProvider)
-    const get = (key: string, varName: string) => graph[key].find(n => n.varName === varName)!
+    const get = (key: string, varName: string) => graph.components[key].find(n => n.varName === varName)!
 
     expect(pick(get('ReactiveProvider', 'config'))).toStrictEqual({
       id: 'ReactiveProvider.config',

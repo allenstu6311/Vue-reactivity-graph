@@ -1,8 +1,8 @@
-export type { NodeType, GraphNode, ComponentGraph } from './types'
+export type { NodeType, GraphNode, GraphData } from './types'
 
-import type { ComponentGraph, GraphNode } from './types'
+import type { GraphData, GraphNode } from './types'
 
-const graph: ComponentGraph = {}
+const graph: GraphData = { components: {}, stores: {} }
 
 let updateCallback: (() => void) | null = null
 
@@ -14,10 +14,14 @@ export function notifyUpdate(): void {
   updateCallback?.()
 }
 
-export function getGraph(): ComponentGraph {
-  return graph
+export function updateComponent(name: string, nodes: GraphNode[]): void {
+  graph.components[name] = nodes
 }
 
-export function updateGraph(name: string, nodes: GraphNode[]): void {
-  graph[name] = nodes
+export function updateStore(storeId: string, nodes: GraphNode[]): void {
+  graph.stores[storeId] = nodes
+}
+
+export function getGraphData(): GraphData {
+  return graph
 }

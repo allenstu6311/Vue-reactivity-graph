@@ -59,13 +59,14 @@ export function collectSetup({
 
 export function collectPiniaState(
   pinia: PiniaInstance,
-  nodes: GraphNode[],
   valNodeMap: WeakMap<object, GraphNode>,
-): void {
-  if (!pinia?._s) return;
+): Record<string, GraphNode[]> {
+  const storeGroups: Record<string, GraphNode[]> = {};
+  if (!pinia?._s) return storeGroups;
   pinia._s.forEach((store) => {
     const storeId: string = store.$id;
     const raw = store.__v_raw ?? store;
+    const storeNodes: GraphNode[] = [];
     for (const key in raw) {
       if (key.startsWith("$") || key.startsWith("_")) continue;
       const val = raw[key];
@@ -80,7 +81,11 @@ export function collectPiniaState(
         subs: [],
       };
       setValNode(valNodeMap, val, node);
-      nodes.push(node);
+      storeNodes.push(node);
+    }
+    if (storeNodes.length > 0) {
+      storeGroups[storeId] = storeNodes;
     }
   });
+  return storeGroups;
 }

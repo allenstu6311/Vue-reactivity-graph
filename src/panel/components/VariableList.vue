@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import type { GraphNode } from '../../graph'
+import type { GraphNode, NodeType } from '../../graph'
 import { NODE_TYPE_META, NODE_TYPES } from '../nodeTypeMeta'
 import { getDisplayName } from './shared/nodeDisplay'
 
 const props = defineProps<{
   nodes: GraphNode[]
   selectedId: string | null
+  groupBy?: 'store'
 }>()
 
 const emit = defineEmits<{
@@ -22,9 +23,23 @@ function getCount(n: GraphNode): number {
 
 const grouped = computed(() => {
   const q = search.value.toLowerCase()
+
+  if (props.groupBy === 'store') {
+    const seenIds = [...new Set(props.nodes.map(n => n.file))]
+    return seenIds.map(storeId => ({
+      type: 'store' as NodeType,
+      config: NODE_TYPE_META['store'],
+      label: storeId,
+      items: props.nodes.filter(
+        n => n.file === storeId && getDisplayName(n).toLowerCase().includes(q)
+      ),
+    })).filter(g => g.items.length > 0)
+  }
+
   return NODE_TYPES.map(type => ({
     type,
     config: NODE_TYPE_META[type],
+    label: NODE_TYPE_META[type].label,
     items: props.nodes.filter(
       n => n.type === type && getDisplayName(n).toLowerCase().includes(q),
     ),
@@ -48,7 +63,7 @@ const grouped = computed(() => {
           class="sec-header"
           :style="{ color: group.config.color, borderLeft: `2px solid ${group.config.color}` }"
         >
-          {{ group.config.label }}
+          {{ group.label }}
         </div>
         <div
           v-for="node in group.items"

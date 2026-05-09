@@ -2,21 +2,32 @@
 import { ref, computed, onMounted } from 'vue'
 import VariableList from './components/VariableList.vue'
 import GraphView from './components/GraphView.vue'
-import type { ComponentGraph } from '../graph'
+import type { GraphData } from '../graph'
 import { useGraphFetcher } from './composables/useGraphFetcher'
 import { useDevtoolsConnection } from './composables/useDevtoolsConnection'
 
-const graph = ref<ComponentGraph>({})
+const graph = ref<GraphData>({ components: {}, stores: {} })
 const selectedComponentName = ref<string>('')
 const selectedId = ref<string | null>(null)
+const activeTab = ref<'components' | 'stores'>('components')
 
-const componentKeys = computed(() => Object.keys(graph.value))
-const currentNodes = computed(() => graph.value[selectedComponentName.value] ?? [])
-const allNodes = computed(() => Object.values(graph.value).flat())
+const componentKeys = computed(() => Object.keys(graph.value.components))
+const currentNodes = computed(() => graph.value.components[selectedComponentName.value] ?? [])
+const allNodes = computed(() => [
+  ...Object.values(graph.value.components).flat(),
+  ...Object.values(graph.value.stores).flat(),
+])
+const storeIds = computed(() =>
+  Object.keys(graph.value.stores).sort()
+)
 
 function onSelectComponent(comp: string) {
   selectedComponentName.value = comp
   selectedId.value = null
+}
+
+function onSelectTab(tab: 'components' | 'stores') {
+  activeTab.value = tab
 }
 
 const { fetchGraph: fetchGraphAsync } = useGraphFetcher()
@@ -25,8 +36,8 @@ async function handleFetchGraph() {
   const result = await fetchGraphAsync()
   if (!result) return
   graph.value = result
-  if (!selectedComponentName.value || !result[selectedComponentName.value]) {
-    selectedComponentName.value = Object.keys(result)[0] ?? ''
+  if (!selectedComponentName.value || !result.components[selectedComponentName.value]) {
+    selectedComponentName.value = Object.keys(result.components)[0] ?? ''
   }
 }
 
@@ -42,24 +53,43 @@ onMounted(() => {
     <div class="panel">
       <!-- LEFT: variable list -->
       <div class="left-wrapper">
+        <!-- Tab bar -->
+        <div class="tab-bar">
+          <button :class="['tab-btn', { active: activeTab === 'components' }]" @click="onSelectTab('components')">
+            Components
+          </button>
+          <button :class="['tab-btn', { active: activeTab === 'stores' }]" @click="onSelectTab('stores')">
+            Stores
+          </button>
+        </div>
+
+        <!-- Selector row -->
         <div class="comp-select-wrap">
-          <div class="select-row">
+          <div class="select-row" v-if="activeTab === 'components'">
             <select
               class="comp-select"
               :value="selectedComponentName"
               @change="onSelectComponent(($event.target as HTMLSelectElement).value)"
             >
-
               <option v-for="key in componentKeys" :key="key" :value="key">
-                {{ graph[key][0]?.file ?? key }}.vue
+                {{ graph.components[key][0]?.file ?? key }}.vue
               </option>
             </select>
             <button class="refresh-btn" title="Refresh" @click="handleFetchGraph">↺</button>
           </div>
+          <div class="select-row" v-else>
+            <select class="comp-select" disabled>
+              <option value=""></option>
+              <option v-for="id in storeIds" :key="id" :value="id">{{ id }}</option>
+            </select>
+            <button class="refresh-btn" title="Refresh" @click="handleFetchGraph">↺</button>
+          </div>
         </div>
+
         <VariableList
-          :nodes="currentNodes"
+          :nodes="activeTab === 'components' ? currentNodes : Object.values(graph.stores).flat()"
           :selected-id="selectedId"
+          :group-by="activeTab === 'stores' ? 'store' : undefined"
           @select="selectedId = $event"
         />
       </div>
@@ -163,6 +193,11 @@ body {
   flex: 1;
 }
 
+.comp-select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .refresh-btn {
   background: #1c2840;
   border: 1px solid #2a3f5c;
@@ -185,5 +220,33 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+
+.tab-bar {
+  display: flex;
+  border-bottom: 1px solid #1f2e45;
+  flex-shrink: 0;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 8px 0;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  background: transparent;
+  border: none;
+  color: #4a5f7a;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color .15s, border-color .15s;
+}
+
+.tab-btn.active {
+  color: #cdd9ee;
+  border-bottom-color: #5c72ab;
+}
+
+.tab-btn:hover:not(.active) {
+  color: #8aa4c8;
 }
 </style>

@@ -4,7 +4,7 @@ import {
 import { WalkContext } from "./context/WalkContext";
 import { patchHmrRuntime, setupHmrHook } from "./hmr";
 import type { VueAppInternals } from "../types/vue-internals";
-import { getGraph, setOnUpdate } from "../graph";
+import { getGraphData, setOnUpdate } from "../graph";
 import type { NodeType } from "../graph";
 
 const appEl = document.querySelector("#app") as
@@ -38,16 +38,29 @@ if (app) {
   }
 
   function refreshGraph() {
-    const plain = Object.fromEntries(
-      Object.entries(getGraph()).map(([comp, nodes]) => [
-        comp,
-        nodes.map((n) => ({
-          ...n,
-          // val: sanitizeVal(n.val, n.type),
-          val: "", // 暫時不顯示資料
-        })),
-      ]),
-    );
+    const graphData = getGraphData();
+    const plain = {
+      components: Object.fromEntries(
+        Object.entries(graphData.components).map(([comp, nodes]) => [
+          comp,
+          nodes.map((n: any) => ({
+            ...n,
+            // val: sanitizeVal(n.val, n.type),
+            val: "", // 暫時不顯示資料
+          })),
+        ]),
+      ),
+      stores: Object.fromEntries(
+        Object.entries(graphData.stores).map(([storeId, nodes]) => [
+          storeId,
+          nodes.map((n: any) => ({
+            ...n,
+            // val: sanitizeVal(n.val, n.type),
+            val: "", // 暫時不顯示資料
+          })),
+        ]),
+      ),
+    };
 
     (window as unknown as Record<string, unknown>).__vueReactivityGraph = plain;
     window.postMessage({ type: "VUE_GRAPH_UPDATE" }, "*");
