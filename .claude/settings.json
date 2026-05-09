@@ -9,8 +9,8 @@
       "WebFetch(domain:github.com)"
     ],
     "deny": [
-      "Bash(git push --force*)",
-      "Bash(git push -f*)"
+      "Bash(git commit*)",
+      "Bash(git push*)"
     ]
   },
   "enabledPlugins": {
