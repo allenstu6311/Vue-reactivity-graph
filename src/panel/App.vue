@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import VariableList from './components/VariableList.vue'
 import GraphView from './components/GraphView.vue'
 import type { ComponentGraph } from '../graph'
-import { devLog } from './utils'
+import { useGraphFetcher } from './composables/useGraphFetcher'
+import { useDevtoolsConnection } from './composables/useDevtoolsConnection'
 
 const graph = ref<ComponentGraph>({})
 const selectedComponentName = ref<string>('')
@@ -18,33 +19,21 @@ function onSelectComponent(comp: string) {
   selectedId.value = null
 }
 
-function fetchGraph() {
-  chrome.devtools.inspectedWindow.eval(
-    'JSON.stringify(window.__vueReactivityGraph)',
-    (result, err) => {
-      if (err) { devLog('fetchGraph error', err); return }
-      if (typeof result !== 'string') { 
-        // devLog('no graph data yet'); 
-        return 
-      }
-      const data = JSON.parse(result) as ComponentGraph
-      graph.value = data
-      // devLog('graph fetched, components:', Object.keys(data))
-      if (!selectedComponentName.value || !data[selectedComponentName.value]) {
-        selectedComponentName.value = Object.keys(data)[0] ?? ''
-      }
-    },
-  )
+const { fetchGraph: fetchGraphAsync } = useGraphFetcher()
+
+async function handleFetchGraph() {
+  const result = await fetchGraphAsync()
+  if (!result) return
+  graph.value = result
+  if (!selectedComponentName.value || !result[selectedComponentName.value]) {
+    selectedComponentName.value = Object.keys(result)[0] ?? ''
+  }
 }
 
-onMounted(() => {
-  fetchGraph()
-  chrome.devtools.network.onNavigated.addListener(fetchGraph)
+useDevtoolsConnection(handleFetchGraph)
 
-  const port = chrome.runtime.connect({ name: 'devtools-panel' })
-  port.onMessage.addListener((msg) => {
-    if (msg.type === 'VUE_GRAPH_UPDATE') fetchGraph()
-  })
+onMounted(() => {
+  handleFetchGraph()
 })
 </script>
 
@@ -65,7 +54,7 @@ onMounted(() => {
                 {{ graph[key][0]?.file ?? key }}.vue
               </option>
             </select>
-            <button class="refresh-btn" title="Refresh" @click="fetchGraph">↺</button>
+            <button class="refresh-btn" title="Refresh" @click="handleFetchGraph">↺</button>
           </div>
         </div>
         <VariableList

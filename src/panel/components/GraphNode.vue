@@ -3,19 +3,13 @@ import { computed } from 'vue'
 import { Handle, Position } from '@vue-flow/core'
 import type { GraphNode } from '../../graph'
 import { NODE_TYPE_META } from '../nodeTypeMeta'
+import { getDisplayName } from './shared/nodeDisplay'
 
 const props = defineProps<{
   data: GraphNode & { focused: boolean }
 }>()
 
 const tc = computed(() => NODE_TYPE_META[props.data.type])
-
-const displayName = computed(() => {
-  if (props.data.type === 'watch') {
-    return `watch(${(props.data.deps ?? []).join(', ')})`
-  }
-  return props.data.varName || ''
-})
 
 function truncate(str: string, max: number) {
   return str.length > max ? str.slice(0, max - 1) + '…' : str
@@ -39,7 +33,7 @@ function truncate(str: string, max: number) {
       {{ tc.label.toUpperCase() }}
     </div>
     <div class="n-name" :style="{ color: data.focused ? '#e8f4ff' : '#cdd9ee' }">
-      {{ truncate(displayName, 18) }}
+      {{ truncate(getDisplayName(data), 18) }}
     </div>
     <div class="n-file">{{ truncate(data.file, 22) }}</div>
     <div v-if="data.val && data.val !== '—'" class="n-val">

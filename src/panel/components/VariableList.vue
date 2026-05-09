@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import type { GraphNode } from '../../graph'
 import { NODE_TYPE_META, NODE_TYPES } from '../nodeTypeMeta'
+import { getDisplayName } from './shared/nodeDisplay'
 
 const props = defineProps<{
   nodes: GraphNode[]
@@ -14,12 +15,6 @@ const emit = defineEmits<{
 
 const search = ref('')
 
-
-function displayName(n: GraphNode): string {
-  if (n.type === 'watch') return `watch(${(n.deps ?? []).join(', ')})`
-  return n?.varName || ''
-}
-
 function getCount(n: GraphNode): number {
   if (n.type === 'ref' || n.type === 'reactive') return n.subs?.length ?? 0
   return n.deps?.length ?? 0
@@ -31,7 +26,7 @@ const grouped = computed(() => {
     type,
     config: NODE_TYPE_META[type],
     items: props.nodes.filter(
-      n => n.type === type && displayName(n).toLowerCase().includes(q),
+      n => n.type === type && getDisplayName(n).toLowerCase().includes(q),
     ),
   })).filter(g => g.items.length > 0)
 })
@@ -63,7 +58,7 @@ const grouped = computed(() => {
           @click="emit('select', node.id)"
         >
           <span class="tbadge" :class="`tb-${node.type}`">{{ group.config.label }}</span>
-          <span class="var-name">{{ displayName(node) }}</span>
+          <span class="var-name">{{ getDisplayName(node) }}</span>
           <span class="var-cnt" :class="{ lit: getCount(node) > 0 }">{{ getCount(node) }}</span>
         </div>
       </template>

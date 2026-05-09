@@ -75,10 +75,13 @@
 | `background/index.ts` | 管理 devtools port，廣播 VUE_GRAPH_UPDATE |
 | `devtools/index.ts` | 建立 DevTools panel（panel.html） |
 | `panel/App.vue` | 根元件：接收更新，管理選取狀態 |
+| `panel/composables/useGraphFetcher.ts` | 封裝 `chrome.devtools.inspectedWindow.eval` 與 graph 反序列化 |
+| `panel/composables/useDevtoolsConnection.ts` | 封裝 port 連線、`onMessage`、`onNavigated` 監聽與清理 |
 | `panel/composables/useLayout.ts` | dagre 佈局 + upstream/downstream BFS 展開 |
 | `panel/components/GraphView.vue` | vue-flow 渲染節點與邊 |
 | `panel/components/GraphNode.vue` | 單一節點外觀 |
 | `panel/components/VariableList.vue` | 左側變數清單 |
+| `panel/components/shared/nodeDisplay.ts` | `getDisplayName` 共用函數 |
 | `panel/nodeTypeMeta.ts` | 各節點類型的顏色、標籤設定 |
 
 ---
