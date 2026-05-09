@@ -1,9 +1,9 @@
 import {
-  collectInstance,
-  triggerInstance,
+  runScan,
 } from "./walker";
 import { WalkContext } from "./context/WalkContext";
-import type { ExtendedComponentInstance, HookComponentEventArgs, VueAppInternals } from "../types/vue-internals";
+import { patchHmrRuntime, setupHmrHook } from "./hmr";
+import type { VueAppInternals } from "../types/vue-internals";
 import { getGraph, setOnUpdate } from "../graph";
 import type { NodeType } from "../graph";
 
@@ -15,7 +15,6 @@ const hmr = (window as any).__VUE_HMR_RUNTIME__;
 
 const hook = (window as any).__VUE_DEVTOOLS_GLOBAL_HOOK__;
 const originalEmit = hook.emit.bind(hook);
-const pendingHmrIds = new Set<string>();
 
 if (app) {
   const ctx = new WalkContext();
@@ -54,46 +53,18 @@ if (app) {
     window.postMessage({ type: "VUE_GRAPH_UPDATE" }, "*");
   }
 
-  if (hmr) {
-    const originalReload = hmr.reload;
-    const originalRender = hmr.rerender;
-
-    hmr.reload = function (id: string, _newComp: unknown) {
-      pendingHmrIds.add(id);
-      return originalReload.call(this, id, _newComp);
-    };
-
-    hmr.rerender = function (id: string, _newComp: unknown) {
-      pendingHmrIds.add(id);
-      return originalRender.call(this, id, _newComp);
-    };
-  }
-
-  hook.emit = function (event: string, ...args: unknown[]) {
-    if (
-      (event === "component:added" || event === "component:updated") &&
-      pendingHmrIds.size > 0
-    ) {
-      const [vueApp, , , instance] = args as HookComponentEventArgs;
-      const hmrId: string | undefined = (instance?.type as any)?.__hmrId;
-      if (hmrId && pendingHmrIds.has(hmrId)) {
-        pendingHmrIds.delete(hmrId);
-        ctx.hmrOverrideMap.set(hmrId, instance);
-        ctx.resetCounts();
-        collectInstance({ rawInstance: vueApp._instance, ctx });
-        ctx.resetCounts();
-        triggerInstance({ rawInstance: vueApp._instance, ctx });
-        ctx.hmrOverrideMap.delete(hmrId);
-        refreshGraph();
-      }
+  if (hmr) patchHmrRuntime(hmr);
+  setupHmrHook(hook, originalEmit, (vueApp, hmrId, instance) => {
+    ctx.hmrOverrideMap.set(hmrId, instance);
+    try {
+      runScan(vueApp._instance, ctx);
+      refreshGraph();
+    } finally {
+      ctx.hmrOverrideMap.delete(hmrId);
     }
-    return originalEmit(event, ...args);
-  };
+  });
 
   setOnUpdate(refreshGraph);
-  ctx.resetCounts();
-  collectInstance({ rawInstance: app, ctx });
-  ctx.resetCounts();
-  triggerInstance({ rawInstance: app, ctx });
+  runScan(app, ctx);
   refreshGraph();
 }

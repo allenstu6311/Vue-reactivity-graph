@@ -51,7 +51,7 @@
 | 檔案 | 職責 |
 |---|---|
 | `injected/index.ts` | 入口：取 `__vue_app__._instance`，掛 HMR hook，呼叫 walker |
-| `injected/walker.ts` | 核心：遍歷 component instance tree，sentinel dry-run 追蹤 prop 來源，建立 GraphNode[] |
+| `injected/walker.ts` | 核心：traverseVNode（DFS 遍歷）、runScan（封裝完整掃描流程）、collectInstance、triggerInstance |
 | `injected/context/WalkContext.ts` | WalkContext class：六個 walker-scoped map、`resolveComponentName`、`resolveInstance`、`resetCounts`；`extractInstanceData` 函數 |
 | `injected/context/types.ts` | `InstanceData` 介面 |
 | `injected/helper/nodes.ts` | `buildNode`、`setValNode`：GraphNode 建立與寫入 valNodeMap |
@@ -63,7 +63,10 @@
 | `injected/collect/inject.ts` | `collectInject`：inject 偵測與 inject node 建立（回傳 injectKeySet） |
 | `injected/collect/setup.ts` | `collectSetup`、`collectPiniaState`：搬自 tracker.ts，Phase 1 節點蒐集 |
 | `injected/collect/watch.ts` | `collectWatch`：watch 節點建立 |
-| `injected/tracker.ts` | `bindSetupTrack`、`markComputedDirtyAndEval` |
+| `injected/subscribers/types.ts` | `TriggerContext`、`BindComputedTrackParams`、`BindWatchTrackParams` 介面 |
+| `injected/subscribers/shared.ts` | `linkNodes`、`createOnTrackHandler` |
+| `injected/subscribers/computed.ts` | `bindComputedTrack`（Phase 2 computed onTrack 綁定） |
+| `injected/subscribers/watch.ts` | `bindWatchTrack`（Phase 2 watch onTrack 綁定） |
 | `graph/types.ts` | 純型別：NodeType, GraphNode, ComponentGraph |
 | `graph/index.ts` | graph 全域狀態 + getGraph / updateGraph / notifyUpdate |
 | `types/vue-internals.d.ts` | Vue 未公開內部型別（ComputedRefImpl, ExtendedComponentInstance 等） |

@@ -54,31 +54,27 @@ export function collectInstance({
 
   updateGraph(componentName, nodes);
   // DFS：遞迴處理子元件樹，確保 DFS 順序維持不變
-  collectVNode({ vnode: instance.subTree, parentComponentName: componentName, ctx });
+  traverseVNode(instance.subTree, componentName, ctx, collectInstance);
 }
 
-export function collectVNode({
-  vnode,
-  parentComponentName,
-  ctx,
-}: {
-  vnode: VNode
-  parentComponentName?: string
+type InstanceVisitor = (params: {
+  rawInstance: ExtendedComponentInstance
+  parentComponentName: string | undefined
   ctx: WalkContext
-}): void {
-  if (!vnode) return;
-  if (vnode.component) {
-    collectInstance({
-      rawInstance: vnode.component as ExtendedComponentInstance,
-      parentComponentName,
-      ctx,
-    });
-  }
+}) => void
+
+function traverseVNode(
+  vnode: VNode,
+  parentComponentName: string | undefined,
+  ctx: WalkContext,
+  fn: InstanceVisitor,
+): void {
+  if (!vnode) return
+  if (vnode.component) fn({ rawInstance: vnode.component as ExtendedComponentInstance, parentComponentName, ctx })
   if (Array.isArray(vnode.children)) {
     vnode.children.forEach((child) => {
-      if (child && typeof child === "object")
-        collectVNode({ vnode: child as VNode, parentComponentName, ctx });
-    });
+      if (child && typeof child === "object") traverseVNode(child as VNode, parentComponentName, ctx, fn)
+    })
   }
 }
 
@@ -152,30 +148,15 @@ export function triggerInstance({
     });
   }
 
-  triggerVNode({ vnode: instance.subTree, parentComponentName: componentName, ctx });
+  traverseVNode(instance.subTree, componentName, ctx, triggerInstance);
 }
 
-export function triggerVNode({
-  vnode,
-  parentComponentName,
-  ctx,
-}: {
-  vnode: VNode
-  parentComponentName?: string
-  ctx: WalkContext
-}): void {
-  if (!vnode) return;
-  if (vnode.component) {
-    triggerInstance({
-      rawInstance: vnode.component as ExtendedComponentInstance,
-      parentComponentName,
-      ctx,
-    });
-  }
-  if (Array.isArray(vnode.children)) {
-    vnode.children.forEach((child) => {
-      if (child && typeof child === "object")
-        triggerVNode({ vnode: child as VNode, parentComponentName, ctx });
-    });
-  }
+export function runScan(root: ExtendedComponentInstance, ctx: WalkContext): void {
+  // Phase 1: 建節點。reset 確保 componentName 計算從頭開始
+  ctx.resetCounts()
+  collectInstance({ rawInstance: root, ctx })
+
+  // Phase 2: 掛 onTrack。再次 reset 確保兩個 phase 算出相同的 componentName
+  ctx.resetCounts()
+  triggerInstance({ rawInstance: root, ctx })
 }
