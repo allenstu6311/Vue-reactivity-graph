@@ -39,8 +39,8 @@
 - `type`：`ref` | `reactive` | `computed` | `watch`
 - `val`：當前值（字串表示）
 - `file`：來源檔案（如 `CartPanel.vue`）
-- `deps`：依賴的變數名稱陣列（computed / watch 有）
-- `subs`：被訂閱的變數名稱陣列（ref / reactive / computed 有）
+- `deps`：依賴節點的完整 id（`componentName.varName` 格式），computed / watch 有
+- `subs`：訂閱者節點的完整 id（`componentName.varName` 格式），ref / reactive / computed 有
 
 整體結構為 `ComponentGraph = Record<string, GraphNode[]>`，key 為 component 名稱。
 
@@ -51,6 +51,7 @@
 | 檔案 | 職責 |
 |---|---|
 | `injected/index.ts` | 入口：取 `__vue_app__._instance`，掛 HMR hook，呼叫 walker |
+| `injected/hmr.ts` | HMR 攔截與轉交：patchHmrRuntime、setupHmrHook；不持有 ctx，不直接呼叫 runScan |
 | `injected/walker.ts` | 核心：traverseVNode（DFS 遍歷）、runScan（封裝完整掃描流程）、collectInstance、triggerInstance |
 | `injected/context/WalkContext.ts` | WalkContext class：六個 walker-scoped map、`resolveComponentName`、`resolveInstance`、`resetCounts`；`extractInstanceData` 函數 |
 | `injected/context/types.ts` | `InstanceData` 介面 |
