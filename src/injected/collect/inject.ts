@@ -1,6 +1,7 @@
 import type { CollectInjectParams } from "./types";
 import type { GraphNode } from "../../graph";
 import { getGraph } from "../../graph";
+import { linkNodes } from "../subscribers/shared";
 
 // DFS 時序契約：anonymous provide node 建立後直接寫入 getGraph()[parentComponentName!]。
 // 此陣列由父層 updateGraph(parentComponentName, nodes) 建立——DFS 保證父層 collectInstance
@@ -79,12 +80,10 @@ export function collectInject(params: CollectInjectParams): Set<string> {
         type: "inject",
         val: (val as any).__v_raw ?? val,
         file,
-        deps: [parentNode.id],
+        deps: [],
         subs: [],
       };
-      if (!parentNode.subs.includes(injectNode.id)) {
-        parentNode.subs.push(injectNode.id);
-      }
+      linkNodes(parentNode, injectNode);
       nodes.push(injectNode);
       const injectRaw = (val as any).__v_raw ?? val;
       ctx.propSourceInjectMap.set(injectRaw as object, injectNode);

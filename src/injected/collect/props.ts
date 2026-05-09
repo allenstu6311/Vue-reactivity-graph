@@ -1,5 +1,6 @@
 import type { CollectPropsParams } from "./types";
 import type { GraphNode } from "../../graph";
+import { linkNodes } from "../subscribers/shared";
 
 // Strategy 1：同名查找（父層 setupState 同名值 → valNodeMap.get）
 // Strategy 2：sentinel dry-run 結果（ctx.instanceChildPropKeyMap.get(instance.parent)）
@@ -63,10 +64,7 @@ export function collectProps(params: CollectPropsParams): void {
     }
 
     if (parentNode) {
-      propNode.deps.push(parentNode.id);
-      if (!parentNode.subs.includes(propNode.id)) {
-        parentNode.subs.push(propNode.id);
-      }
+      linkNodes(parentNode, propNode);
     }
   }
 }

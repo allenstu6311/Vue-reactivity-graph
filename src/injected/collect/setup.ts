@@ -5,6 +5,7 @@ import type {
 } from "../../types/vue-internals";
 import { buildNode, setValNode } from "../helper/nodes";
 import { isStoreToRefsRef, isPiniaStoreProxy } from "../helper/resolve";
+import { linkNodes } from "../subscribers/shared";
 import type { CollectSetupParams } from "./types";
 
 // Phase 1: 建 node、存 valNodeMap
@@ -40,9 +41,7 @@ export function collectSetup({
 
       const componentNode = buildNode(key, trackedVal, componentName, file);
       if (componentNode && storeNode) {
-        componentNode.deps.push(storeNode.id);
-        if (!storeNode.subs.includes(componentNode.id))
-          storeNode.subs.push(componentNode.id);
+        linkNodes(storeNode, componentNode);
         storeValToComponentNode.set(storeVal as object, componentNode);
         valNodeMap.set(trackedVal, componentNode);
         nodes.push(componentNode);

@@ -1,12 +1,12 @@
-import type { DebuggerEvent, VNode } from "vue";
+import type { VNode } from "vue";
 import type {
   ExtendedComponentInstance,
   PiniaInstance,
-  WatchEffect,
 } from "../types/vue-internals";
-import { bindSetupTrack } from "./tracker";
-import { resolveDepNode, resolveDepName, isStoreToRefsRef } from "./helper/resolve";
-import { GraphNode, updateGraph, getGraph, notifyUpdate } from "../graph";
+import { bindComputedTrack } from "./subscribers/computed";
+import { bindWatchTrack } from "./subscribers/watch";
+import { isStoreToRefsRef } from "./helper/resolve";
+import { GraphNode, updateGraph, getGraph } from "../graph";
 import { WalkContext, extractInstanceData } from "./context/WalkContext";
 import { runSentinelDryRun } from "./collect/sentinel";
 import { collectProps } from "./collect/props";
@@ -129,7 +129,7 @@ export function triggerInstance({
     }
   }
   if (rawSetupState) {
-    bindSetupTrack({
+    bindComputedTrack({
       rawSetupState,
       componentName,
       valNodeMap: ctx.valNodeMap,
@@ -140,45 +140,15 @@ export function triggerInstance({
   }
 
   if (watchEffects && watchEffects.length > 0) {
-    watchEffects.forEach((effect: WatchEffect, index: number) => {
-      const watchShortName = `w_${index}`;
-      const watchNode = nodes.find(
-        (n) => n.type === "watch" && n.varName === watchShortName,
-      );
-      if (!watchNode) return;
-
-      const watchFullId = `${componentName}.${watchShortName}`;
-
-      effect.onTrack = (event: DebuggerEvent) => {
-        const depName = resolveDepName(
-          event.target as object,
-          event.key,
-          ctx.propKeyNodeMap,
-          ctx.valNodeMap,
-        );
-        if (!depName) return;
-
-        const depNode = resolveDepNode({
-          target: event.target as object,
-          key: event.key,
-          depName,
-          rawSetupState,
-          valNodeMap: ctx.valNodeMap,
-          propKeyNodeMap: ctx.propKeyNodeMap,
-          injectRawToLocalNode,
-          storeValToComponentNode,
-        });
-
-        if (depNode) {
-          if (!watchNode.deps.includes(depNode.id))
-            watchNode.deps.push(depNode.id);
-          if (!depNode.subs.includes(watchFullId))
-            depNode.subs.push(watchFullId);
-        }
-
-        notifyUpdate();
-      };
-      effect.run();
+    bindWatchTrack({
+      nodes,
+      watchEffects,
+      componentName,
+      rawSetupState,
+      valNodeMap: ctx.valNodeMap,
+      propKeyNodeMap: ctx.propKeyNodeMap,
+      injectRawToLocalNode,
+      storeValToComponentNode,
     });
   }
 
