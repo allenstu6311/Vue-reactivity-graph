@@ -5,11 +5,13 @@ import GraphView from './components/GraphView.vue'
 import type { GraphData } from '../graph'
 import { useGraphFetcher } from './composables/useGraphFetcher'
 import { useDevtoolsConnection } from './composables/useDevtoolsConnection'
+import { TAB } from './tabs'
+import type { Tab } from './tabs'
 
 const graph = ref<GraphData>({ components: {}, stores: {} })
 const selectedComponentName = ref<string>('')
 const selectedId = ref<string | null>(null)
-const activeTab = ref<'components' | 'stores'>('components')
+const activeTab = ref<Tab>(TAB.Components)
 
 const componentKeys = computed(() => Object.keys(graph.value.components))
 const currentNodes = computed(() => graph.value.components[selectedComponentName.value] ?? [])
@@ -26,14 +28,14 @@ function onSelectComponent(comp: string) {
   selectedId.value = null
 }
 
-function onSelectTab(tab: 'components' | 'stores') {
+function onSelectTab(tab: Tab) {
   activeTab.value = tab
 }
 
-const { fetchGraph: fetchGraphAsync } = useGraphFetcher()
+const { fetchGraph } = useGraphFetcher()
 
 async function handleFetchGraph() {
-  const result = await fetchGraphAsync()
+  const result = await fetchGraph()
   if (!result) return
   graph.value = result
   if (!selectedComponentName.value || !result.components[selectedComponentName.value]) {
@@ -55,17 +57,17 @@ onMounted(() => {
       <div class="left-wrapper">
         <!-- Tab bar -->
         <div class="tab-bar">
-          <button :class="['tab-btn', { active: activeTab === 'components' }]" @click="onSelectTab('components')">
+          <button :class="['tab-btn', { active: activeTab === TAB.Components }]" @click="onSelectTab(TAB.Components)">
             Components
           </button>
-          <button :class="['tab-btn', { active: activeTab === 'stores' }]" @click="onSelectTab('stores')">
+          <button :class="['tab-btn', { active: activeTab === TAB.Stores }]" @click="onSelectTab(TAB.Stores)">
             Stores
           </button>
         </div>
 
         <!-- Selector row -->
         <div class="comp-select-wrap">
-          <div class="select-row" v-if="activeTab === 'components'">
+          <div class="select-row" v-if="activeTab === TAB.Components">
             <select
               class="comp-select"
               :value="selectedComponentName"
@@ -87,9 +89,9 @@ onMounted(() => {
         </div>
 
         <VariableList
-          :nodes="activeTab === 'components' ? currentNodes : Object.values(graph.stores).flat()"
+          :nodes="activeTab === TAB.Components ? currentNodes : Object.values(graph.stores).flat()"
           :selected-id="selectedId"
-          :group-by="activeTab === 'stores' ? 'store' : undefined"
+          :group-by="activeTab === TAB.Stores ? 'store' : undefined"
           @select="selectedId = $event"
         />
       </div>

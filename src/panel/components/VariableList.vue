@@ -16,10 +16,10 @@ const emit = defineEmits<{
 
 const search = ref('')
 
-function getCount(n: GraphNode): number {
-  if (n.type === 'ref' || n.type === 'reactive') return n.subs?.length ?? 0
-  return n.deps?.length ?? 0
-}
+// function getCount(n: GraphNode): number {
+//   if (n.type === 'ref' || n.type === 'reactive') return n.subs?.length ?? 0
+//   return n.deps?.length ?? 0
+// }
 
 const grouped = computed(() => {
   const q = search.value.toLowerCase()
@@ -74,7 +74,7 @@ const grouped = computed(() => {
         >
           <span class="tbadge" :class="`tb-${node.type}`">{{ group.config.label }}</span>
           <span class="var-name">{{ getDisplayName(node) }}</span>
-          <span class="var-cnt" :class="{ lit: getCount(node) > 0 }">{{ getCount(node) }}</span>
+          <!-- <span class="var-cnt" :class="{ lit: getCount(node) > 0 }">{{ getCount(node) }}</span> -->
         </div>
       </template>
     </div>
