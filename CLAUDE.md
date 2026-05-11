@@ -116,7 +116,12 @@
 所有開發需求（Feature / Bugfix / Refactor）走以下固定流程，不得跳步：
 
 **Step 1 — 需求分析**
-收到任何需求，立刻呼叫 `spec-writer`，產出 `spec.md`。
+
+大型 Feature / 模糊需求 / 需要拆工：
+先使用 `to-prd`，再使用 `to-issues`，最後針對選定 issue 呼叫 `spec-writer` 產出 `spec.md`。
+
+Bugfix / 小型 Refactor / 明確工程修改：
+直接呼叫 `spec-writer` 產出 `spec.md`。
 
 **Step 2 — 領域審閱**
 `spec-writer` 完成後，根據 spec.md 末尾的「審閱建議」呼叫對應的 Vue 領域代理人，審閱並補充實作細節：
