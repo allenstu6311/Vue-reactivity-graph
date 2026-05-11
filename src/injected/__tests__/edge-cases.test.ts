@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { defineComponent, ref, provide, inject, h } from 'vue'
-import { runWalker } from './test-utils'
+import { runWalker, getComponentNodes, makeId } from './test-utils'
 import type { GraphNode } from '../../graph'
 
 function pick(node: GraphNode) {
@@ -77,7 +77,7 @@ const AnonProvider = defineComponent({
 describe('Edge Cases', () => {
   it('inject 無對應 provider：節點類型為 ref，deps 為空（inject node 不建立）', () => {
     const graph = runWalker(NoProviderParent)
-    const childNodes = graph.components['NoProviderParent.NoProviderChild']
+    const childNodes = getComponentNodes(graph, 'NoProviderParent.NoProviderChild')
     const countNode = childNodes.find(n => n.varName === 'count')
 
     expect(countNode?.type).toBe('ref')
@@ -86,30 +86,33 @@ describe('Edge Cases', () => {
 
   it('鏈式 re-provide A→B→C：C 直接連回 A，B 的 inject node subs 為空', () => {
     const graph = runWalker(ChainA)
-    const get = (key: string, varName: string) =>
-      graph.components[key].find(n => n.varName === varName)!
+    const get = (path: string, varName: string) =>
+      getComponentNodes(graph, path).find(n => n.varName === varName)!
 
-    expect(pick(get('ChainA', 'num'))).toStrictEqual({
-      id: 'ChainA.num',
+    const chainANum = get('ChainA', 'num')
+    expect(pick(chainANum)).toStrictEqual({
+      id: makeId(graph, 'ChainA', 'num'),
       varName: 'num',
       type: 'ref',
       deps: [],
-      subs: ['ChainA.ChainB.num', 'ChainA.ChainB.ChainC.num'],
+      subs: [makeId(graph, 'ChainA.ChainB', 'num'), makeId(graph, 'ChainA.ChainB.ChainC', 'num')],
     })
 
-    expect(pick(get('ChainA.ChainB', 'num'))).toStrictEqual({
-      id: 'ChainA.ChainB.num',
+    const chainBNum = get('ChainA.ChainB', 'num')
+    expect(pick(chainBNum)).toStrictEqual({
+      id: makeId(graph, 'ChainA.ChainB', 'num'),
       varName: 'num',
       type: 'inject',
-      deps: ['ChainA.num'],
+      deps: [makeId(graph, 'ChainA', 'num')],
       subs: [],
     })
 
-    expect(pick(get('ChainA.ChainB.ChainC', 'num'))).toStrictEqual({
-      id: 'ChainA.ChainB.ChainC.num',
+    const chainCNum = get('ChainA.ChainB.ChainC', 'num')
+    expect(pick(chainCNum)).toStrictEqual({
+      id: makeId(graph, 'ChainA.ChainB.ChainC', 'num'),
       varName: 'num',
       type: 'inject',
-      deps: ['ChainA.num'],
+      deps: [makeId(graph, 'ChainA', 'num')],
       subs: [],
     })
   })
@@ -117,14 +120,14 @@ describe('Edge Cases', () => {
   it('provide 匿名 ref：建 anonymous node，子層 inject 連回父層', () => {
     const graph = runWalker(AnonProvider)
 
-    const parentNodes = graph.components['AnonProvider']
+    const parentNodes = getComponentNodes(graph, 'AnonProvider')
     const anonNode = parentNodes.find(n => n.varName === 'anonymous')
     expect(anonNode?.type).toBe('ref')
-    expect(anonNode?.subs).toContain('AnonProvider.AnonReceiver.count')
+    expect(anonNode?.subs).toContain(makeId(graph, 'AnonProvider.AnonReceiver', 'count'))
 
-    const childNodes = graph.components['AnonProvider.AnonReceiver']
+    const childNodes = getComponentNodes(graph, 'AnonProvider.AnonReceiver')
     const countNode = childNodes.find(n => n.varName === 'count')
     expect(countNode?.type).toBe('inject')
-    expect(countNode?.deps).toEqual(['AnonProvider.anonymous:count'])
+    expect(countNode?.deps).toEqual([makeId(graph, 'AnonProvider', 'anonymous:count')])
   })
 })

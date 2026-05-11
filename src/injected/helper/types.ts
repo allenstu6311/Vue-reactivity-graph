@@ -24,7 +24,9 @@ export interface ResolveDepNodeParams {
 
 export interface BindSetupTrackParams {
   rawSetupState: Data;
-  componentName: string;
+  uid: number;
+  name: string;
+  path: string;
   valNodeMap: WeakMap<object, GraphNode>;
   propKeyNodeMap: WeakMap<object, Map<string, GraphNode>>;
   injectRawToLocalNode: Map<object, GraphNode>;
@@ -33,7 +35,9 @@ export interface BindSetupTrackParams {
 
 // 供 collect/ 各模組使用的共用參數基底
 export interface BaseCollectParams {
-  componentName: string;
+  uid: number;
+  name: string;
+  path: string;
   file: string;
   nodes: GraphNode[];
   valNodeMap: WeakMap<object, GraphNode>;

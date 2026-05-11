@@ -88,7 +88,7 @@ graph TD
     Q --> R[Sentinel Dry-run\n暫換 setupState 為 sentinelProxy\n呼叫 render 取 VNode tree\n還原 setupState]
     R --> S[traverseVNodeForSentinels\n掃 VNode props 中的 Symbol\n建立 childType → propName → parentKey 對應表\ninstanceChildPropKeyMap.set instance, map]
 
-    S --> T[updateGraph\ntraverseVNode 遞迴子樹]
+    S --> T[updateComponent\ntraverseVNode 遞迴子樹]
 ```
 
 ---

@@ -7,26 +7,31 @@ export class WalkContext {
   propKeyNodeMap: WeakMap<object, Map<string, GraphNode>> = new WeakMap()
   propSourceInjectMap: WeakMap<object, GraphNode> = new WeakMap()
   hmrOverrideMap: Map<string, ExtendedComponentInstance> = new Map()
-  componentKeyCountMap: Map<string, number> = new Map()
   instanceChildPropKeyMap: WeakMap<
     object,
     Map<object, { maps: Map<string, string>[]; nextIndex: number }>
   > = new WeakMap()
 
-  resolveComponentName(parentName: string | undefined, file: string): string {
-    const undeduplicatedName = parentName ? `${parentName}.${file}` : file
+  resolveComponentKey(
+    parentPath: string | undefined,
+    file: string,
+    uid: number
+  ): { key: string; name: string; path: string } {
+    const path = parentPath ? `${parentPath}.${file}` : file
 
-    // 子組件重用
-    const count = this.componentKeyCountMap.get(undeduplicatedName) ?? 0
-    this.componentKeyCountMap.set(undeduplicatedName, count + 1)
-    const componentName =
-      count === 0 ? undeduplicatedName : `${undeduplicatedName}_${count}`
-
-    return componentName
+    return {
+      key: uid.toString(),
+      name: file,
+      path,
+    }
   }
 
-  resetCounts(): void {
-    this.componentKeyCountMap.clear()
+  reset(): void {
+    // 重建四個 WeakMap，保留 hmrOverrideMap
+    this.valNodeMap = new WeakMap()
+    this.propKeyNodeMap = new WeakMap()
+    this.propSourceInjectMap = new WeakMap()
+    this.instanceChildPropKeyMap = new WeakMap()
   }
 
   resolveInstance(instance: ExtendedComponentInstance): ExtendedComponentInstance {

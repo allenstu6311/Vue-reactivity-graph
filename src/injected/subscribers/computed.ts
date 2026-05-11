@@ -11,7 +11,9 @@ function markComputedDirtyAndEval(val: ComputedRefImpl): void {
 
 export function bindComputedTrack({
   rawSetupState,
-  componentName,
+  uid,
+  name,
+  path,
   valNodeMap,
   propKeyNodeMap,
   injectRawToLocalNode,
@@ -26,7 +28,9 @@ export function bindComputedTrack({
       if (!subNode || subNode.type === "store") continue
 
       computedImpl.onTrack = createOnTrackHandler(subNode, subNode.id, {
-        componentName,
+        uid,
+        name,
+        path,
         rawSetupState,
         valNodeMap,
         propKeyNodeMap,

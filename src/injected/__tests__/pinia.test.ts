@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest'
 import { defineComponent, computed, watch, h } from 'vue'
 import { defineStore, storeToRefs, createPinia } from 'pinia'
 import { ref, reactive } from 'vue'
-import { runWalker } from './test-utils'
+import { runWalker, getComponentNodes, makeId } from './test-utils'
 import type { GraphNode } from '../../graph'
 
 // ── Test store ────────────────────────────────────────────────────────────
@@ -42,82 +42,82 @@ describe('Phase 2 — Pinia Store 追蹤', () => {
   it('建立正確數量的節點並連線 deps / subs', () => {
     const graph = runWalker(TestComp, [createPinia()])
 
-    const compNodes = graph.components['TestComp']
+    const compNodes = getComponentNodes(graph, 'TestComp')
     const storeNodes = graph.stores['test']
 
     expect(compNodes).toBeDefined()
     expect(storeNodes).toBeDefined()
-    // 7 component nodes（storeToRefs wrappers + computed + watch）
-    expect(compNodes).toHaveLength(7)
+    // 8 component nodes（sentinel + storeToRefs wrappers + computed + watch）
+    expect(compNodes).toHaveLength(8)
     // 3 store nodes（test.count / test.items / test.double）
     expect(storeNodes).toHaveLength(3)
 
-    const get = (id: string) => compNodes.find(n => n.id === id)!
+    const getComp = (varName: string) => compNodes.find(n => n.varName === varName)!
 
     // storeToRefs ref wrapper：count
     // ref 透過 auto-unwrap 觸發兩次 onTrack，storeValToComponentNode 正確攔截
-    // expect(pick(get('TestComp.count'))).toStrictEqual({
-    //   id: 'TestComp.count',
+    // expect(pick(getComp('count'))).toStrictEqual({
+    //   id: makeId(graph, 'TestComp', 'count'),
     //   varName: 'count',
     //   type: 'ref',
     //   deps: ['test.count'],
-    //   subs: ['TestComp.fromRef', 'TestComp.w_0'],
+    //   subs: [makeId(graph, 'TestComp', 'fromRef'), makeId(graph, 'TestComp', 'w_0')],
     // })
 
     // storeToRefs reactive wrapper：items
     // Phase 1 靜態建立 deps，subscriber 因 reactive 不會 auto-unwrap 而無法追蹤 items
-    expect(pick(get('TestComp.items'))).toStrictEqual({
-      id: 'TestComp.items',
+    expect(pick(getComp('items'))).toStrictEqual({
+      id: makeId(graph, 'TestComp', 'items'),
       varName: 'items',
       type: 'ref',
       deps: ['test.items'],
-      subs: ['TestComp.fromReactive'],
+      subs: [makeId(graph, 'TestComp', 'fromReactive')],
     })
 
     // storeToRefs computed wrapper：double
     // wrapper 的 getter 走 store proxy → 觸發 store computed 的 onTrack → deps / subs 正確連線
-    expect(pick(get('TestComp.double'))).toStrictEqual({
-      id: 'TestComp.double',
+    expect(pick(getComp('double'))).toStrictEqual({
+      id: makeId(graph, 'TestComp', 'double'),
       varName: 'double',
       type: 'computed',
       deps: ['test.double'],
-      subs: ['TestComp.fromComputed'],
+      subs: [makeId(graph, 'TestComp', 'fromComputed')],
     })
 
     // computed：fromRef（讀 storeToRefs ref）
-    expect(pick(get('TestComp.fromRef'))).toStrictEqual({
-      id: 'TestComp.fromRef',
+    expect(pick(getComp('fromRef'))).toStrictEqual({
+      id: makeId(graph, 'TestComp', 'fromRef'),
       varName: 'fromRef',
       type: 'computed',
-      deps: ['TestComp.count'],
+      deps: [makeId(graph, 'TestComp', 'count')],
       subs: [],
     })
 
     // computed：fromReactive（讀 storeToRefs reactive）
     // items（ObjectRefImpl）觸發 trackRefValue → onTrack → valNodeMap.get(items) → TestComp.items 節點
-    expect(pick(get('TestComp.fromReactive'))).toStrictEqual({
-      id: 'TestComp.fromReactive',
+    expect(pick(getComp('fromReactive'))).toStrictEqual({
+      id: makeId(graph, 'TestComp', 'fromReactive'),
       varName: 'fromReactive',
       type: 'computed',
-      deps: ['TestComp.items'],
+      deps: [makeId(graph, 'TestComp', 'items')],
       subs: [],
     })
 
     // computed：fromComputed（讀 storeToRefs computed wrapper）
-    expect(pick(get('TestComp.fromComputed'))).toStrictEqual({
-      id: 'TestComp.fromComputed',
+    expect(pick(getComp('fromComputed'))).toStrictEqual({
+      id: makeId(graph, 'TestComp', 'fromComputed'),
       varName: 'fromComputed',
       type: 'computed',
-      deps: ['TestComp.double'],
+      deps: [makeId(graph, 'TestComp', 'double')],
       subs: [],
     })
 
     // watch：w_0（監聽 storeToRefs ref）
-    expect(pick(get('TestComp.w_0'))).toStrictEqual({
-      id: 'TestComp.w_0',
+    expect(pick(getComp('w_0'))).toStrictEqual({
+      id: makeId(graph, 'TestComp', 'w_0'),
       varName: 'w_0',
       type: 'watch',
-      deps: ['TestComp.count'],
+      deps: [makeId(graph, 'TestComp', 'count')],
       subs: [],
     })
   })
@@ -128,12 +128,12 @@ describe('Phase 2 — Pinia Store 追蹤', () => {
 
     expect(storeNodes).toBeDefined()
 
-    const get = (id: string) => storeNodes.find(n => n.id === id)!
+    const getStore = (varName: string) => storeNodes.find(n => n.varName === varName)!
 
     // ref：Phase 1 靜態建立連結
-    expect(get('test.count').subs).toStrictEqual(['TestComp.count'])
+    expect(getStore('count').subs).toStrictEqual([makeId(graph, 'TestComp', 'count')])
     // reactive：Phase 1 靜態建立連結
-    expect(get('test.items').subs).toStrictEqual(['TestComp.items'])
-    expect(get('test.double').subs).toStrictEqual(['TestComp.double'])
+    expect(getStore('items').subs).toStrictEqual([makeId(graph, 'TestComp', 'items')])
+    expect(getStore('double').subs).toStrictEqual([makeId(graph, 'TestComp', 'double')])
   })
 })

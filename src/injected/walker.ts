@@ -6,7 +6,7 @@ import type {
 import { bindComputedTrack } from "./subscribers/computed";
 import { bindWatchTrack } from "./subscribers/watch";
 import { isStoreToRefsRef } from "./helper/resolve";
-import { GraphNode, updateComponent, updateStore, getGraphData } from "../graph";
+import { GraphNode, updateComponent, updateStore, getGraphData, clearGraph } from "../graph";
 import { WalkContext, extractInstanceData } from "./context/WalkContext";
 import { runSentinelDryRun } from "./collect/sentinel";
 import { collectProps } from "./collect/props";
@@ -17,58 +17,72 @@ import { collectWatch } from "./collect/watch";
 // Phase 1: 蒐集所有節點，不觸發任何訂閱者
 export function collectInstance({
   rawInstance,
-  parentComponentName,
+  parent,
   ctx,
 }: {
   rawInstance: ExtendedComponentInstance
-  parentComponentName?: string
+  parent?: { uid: number; path: string }
   ctx: WalkContext
 }): void {
   const instance = ctx.resolveInstance(rawInstance);
   const { file, rawSetupState, watchEffects } = extractInstanceData(instance);
   const propsOptions = instance.propsOptions?.[0];
   const parentRawSetupState = instance.parent?.setupState?.["__v_raw"];
-  const componentName = ctx.resolveComponentName(parentComponentName, file);
+  const { key, name, path } = ctx.resolveComponentKey(parent?.path, file, instance.uid);
   const nodes: GraphNode[] = [];
+
+  // 插入 metadata sentinel node
+  nodes.push({
+    id: key,
+    uid: instance.uid,
+    parentUid: parent?.uid,
+    name,
+    path,
+    type: 'component',
+    val: null,
+    file,
+    deps: [],
+    subs: [],
+  });
 
   // 1. run sentinel dry-run（寫入 ctx.instanceChildPropKeyMap，子層 collectProps 會讀）
   runSentinelDryRun({ instance, rawSetupState, propsOptions, ctx });
 
   // 2. collect props（Strategy 1 / 2 來源連結）
-  collectProps({ instance, componentName, file, nodes, ctx, propsOptions, parentRawSetupState });
+  collectProps({ instance, uid: instance.uid, name, path, file, nodes, ctx, propsOptions, parentRawSetupState });
 
   // 3. collect inject（回傳 injectKeySet 供 setup 跳過同名 key）
-  const injectKeys = collectInject({ instance, componentName, parentComponentName, file, nodes, ctx, rawSetupState });
+  const injectKeys = collectInject({ instance, uid: instance.uid, name, path, parent, file, nodes, ctx, rawSetupState });
 
   // 5. collect setup state（跳過 inject keys）
   const storeValToComponentNode = new Map<object, GraphNode>();
-  collectSetup({ rawSetupState, componentName, file, nodes, valNodeMap: ctx.valNodeMap, skipKeys: injectKeys, storeValToComponentNode });
+  collectSetup({ rawSetupState, uid: instance.uid, name, path, file, nodes, valNodeMap: ctx.valNodeMap, skipKeys: injectKeys, storeValToComponentNode });
 
   // 6. collect watch
-  collectWatch({ instance, componentName, file, nodes, watchEffects });
+  collectWatch({ instance, uid: instance.uid, name, path, file, nodes, watchEffects });
 
-  updateComponent(componentName, nodes);
+  updateComponent(key, nodes);
   // DFS：遞迴處理子元件樹，確保 DFS 順序維持不變
-  traverseVNode(instance.subTree, componentName, ctx, collectInstance);
+  traverseVNode(instance.subTree, { uid: instance.uid, path }, ctx, collectInstance);
 }
 
 type InstanceVisitor = (params: {
   rawInstance: ExtendedComponentInstance
-  parentComponentName: string | undefined
+  parent?: { uid: number; path: string }
   ctx: WalkContext
 }) => void
 
 function traverseVNode(
   vnode: VNode,
-  parentComponentName: string | undefined,
+  parent: { uid: number; path: string } | undefined,
   ctx: WalkContext,
   fn: InstanceVisitor,
 ): void {
   if (!vnode) return
-  if (vnode.component) fn({ rawInstance: vnode.component as ExtendedComponentInstance, parentComponentName, ctx })
+  if (vnode.component) fn({ rawInstance: vnode.component as ExtendedComponentInstance, parent, ctx })
   if (Array.isArray(vnode.children)) {
     vnode.children.forEach((child) => {
-      if (child && typeof child === "object") traverseVNode(child as VNode, parentComponentName, ctx, fn)
+      if (child && typeof child === "object") traverseVNode(child as VNode, parent, ctx, fn)
     })
   }
 }
@@ -76,11 +90,11 @@ function traverseVNode(
 // Phase 2: 觸發所有訂閱者，此時所有 node 已蒐集完畢
 export function triggerInstance({
   rawInstance,
-  parentComponentName,
+  parent,
   ctx,
 }: {
   rawInstance: ExtendedComponentInstance
-  parentComponentName?: string
+  parent?: { uid: number; path: string }
   ctx: WalkContext
 }): void {
 
@@ -88,9 +102,9 @@ export function triggerInstance({
 
   const { file, rawSetupState, watchEffects } = extractInstanceData(instance);
 
-  const componentName = ctx.resolveComponentName(parentComponentName, file);
+  const key = instance.uid.toString();
 
-  const nodes = getGraphData().components[componentName] ?? [];
+  const nodes = getGraphData().components[key] ?? [];
 
   // per-component inject lookup：raw → injectNode，供 Phase 2 onTrack resolveDepNode 使用
   // 每次 triggerInstance 重建：A、B 兩個兄弟 component 若 inject 同一個 provide 值（同一 raw object），
@@ -122,7 +136,9 @@ export function triggerInstance({
   if (rawSetupState) {
     bindComputedTrack({
       rawSetupState,
-      componentName,
+      uid: instance.uid,
+      name: nodes[0]?.name ?? '',
+      path: nodes[0]?.path ?? '',
       valNodeMap: ctx.valNodeMap,
       propKeyNodeMap: ctx.propKeyNodeMap,
       injectRawToLocalNode,
@@ -134,7 +150,6 @@ export function triggerInstance({
     bindWatchTrack({
       nodes,
       watchEffects,
-      componentName,
       rawSetupState,
       valNodeMap: ctx.valNodeMap,
       propKeyNodeMap: ctx.propKeyNodeMap,
@@ -143,10 +158,13 @@ export function triggerInstance({
     });
   }
 
-  traverseVNode(instance.subTree, componentName, ctx, triggerInstance);
+  traverseVNode(instance.subTree, { uid: instance.uid, path: nodes[0]?.path ?? '' }, ctx, triggerInstance);
 }
 
 export function runScan(root: ExtendedComponentInstance, ctx: WalkContext): void {
+  clearGraph()
+  ctx.reset()
+
   const pinia = root.appContext?.app?.config?.globalProperties?.$pinia as PiniaInstance | undefined
   if (pinia) {
     const storeGroups = collectPiniaState(pinia, ctx.valNodeMap)
@@ -155,11 +173,9 @@ export function runScan(root: ExtendedComponentInstance, ctx: WalkContext): void
     }
   }
 
-  // Phase 1: 建節點。reset 確保 componentName 計算從頭開始
-  ctx.resetCounts()
+  // Phase 1: 建節點
   collectInstance({ rawInstance: root, ctx })
 
-  // Phase 2: 掛 onTrack。再次 reset 確保兩個 phase 算出相同的 componentName
-  ctx.resetCounts()
+  // Phase 2: 掛 onTrack
   triggerInstance({ rawInstance: root, ctx })
 }

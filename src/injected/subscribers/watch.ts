@@ -5,31 +5,26 @@ import { createOnTrackHandler } from "./shared"
 export function bindWatchTrack({
   nodes,
   watchEffects,
-  componentName,
   rawSetupState,
   valNodeMap,
   propKeyNodeMap,
   injectRawToLocalNode,
   storeValToComponentNode,
 }: BindWatchTrackParams): void {
+  // 從 nodes 陣列過濾 watch 節點
+  const watchNodes = nodes.filter((n) => n.type === "watch")
+
   watchEffects.forEach((effect: WatchEffect, index: number) => {
-    const watchShortName = `w_${index}`
-    const watchNode = nodes.find(
-      (n) => n.type === "watch" && n.varName === watchShortName,
-    )
+    const watchNode = watchNodes[index]
     if (!watchNode) return
 
-    const watchFullId = `${componentName}.${watchShortName}`
-
-    effect.onTrack = createOnTrackHandler(watchNode, watchFullId, {
-      componentName,
+    effect.onTrack = createOnTrackHandler(watchNode, watchNode.id, {
       rawSetupState,
       valNodeMap,
       propKeyNodeMap,
       injectRawToLocalNode,
       storeValToComponentNode,
     }) as any
-
     effect.run()
   })
 }

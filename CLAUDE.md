@@ -35,14 +35,18 @@
 詳細型別定義見 `src/graph/types.ts`。
 
 每個節點（`GraphNode`）：
-- `id`：`${componentName}.${varName}`，全域唯一
-- `type`：`ref` | `reactive` | `computed` | `watch`
+- `id`：`${uid}.${varName}`，全域唯一（uid 為 Vue component instance 的內部 uid）
+- `type`：`ref` | `reactive` | `computed` | `watch` | `component`（sentinel）
 - `val`：當前值（字串表示）
 - `file`：來源檔案（如 `CartPanel.vue`）
-- `deps`：依賴節點的完整 id（`componentName.varName` 格式），computed / watch 有
-- `subs`：訂閱者節點的完整 id（`componentName.varName` 格式），ref / reactive / computed 有
+- `uid`：所屬 component 的 Vue uid（sentinel node 專用欄位）
+- `parentUid`：父層 component 的 Vue uid（sentinel node 專用欄位）
+- `name`：component 名稱（sentinel node 專用欄位）
+- `path`：component 路徑，同名元件加 `_N` 後綴（sentinel node 專用欄位）
+- `deps`：依賴節點的完整 id（`uid.varName` 格式），computed / watch 有
+- `subs`：訂閱者節點的完整 id（`uid.varName` 格式），ref / reactive / computed 有
 
-整體結構為 `ComponentGraph = Record<string, GraphNode[]>`，key 為 component 名稱。
+整體結構為 `GraphData.components: Record<string, GraphNode[]>`，key 為 uid string。每個 component 的 `nodes[0]` 為 `type: 'component'` 的 sentinel node，記錄 uid / parentUid / name / path 元資料，ComponentTree 據此重建樹形結構。
 
 ---
 
@@ -53,7 +57,7 @@
 | `injected/index.ts` | 入口：取 `__vue_app__._instance`，掛 HMR hook，呼叫 walker |
 | `injected/hmr.ts` | HMR 攔截與轉交：patchHmrRuntime、setupHmrHook；不持有 ctx，不直接呼叫 runScan |
 | `injected/walker.ts` | 核心：traverseVNode（DFS 遍歷）、runScan（封裝完整掃描流程）、collectInstance、triggerInstance |
-| `injected/context/WalkContext.ts` | WalkContext class：六個 walker-scoped map、`resolveComponentName`、`resolveInstance`、`resetCounts`；`extractInstanceData` 函數 |
+| `injected/context/WalkContext.ts` | WalkContext class：六個 walker-scoped map、`resolveComponentKey`、`resolveInstance`、`reset`；`extractInstanceData` 函數 |
 | `injected/context/types.ts` | `InstanceData` 介面 |
 | `injected/helper/nodes.ts` | `buildNode`、`setValNode`：GraphNode 建立與寫入 valNodeMap |
 | `injected/helper/resolve.ts` | `resolveDepName`、`resolveDepNode`、`isPiniaStoreProxy`、`isStoreToRefsRef` |

@@ -11,7 +11,9 @@ import type { CollectSetupParams } from "./types";
 // Phase 1: 建 node、存 valNodeMap
 export function collectSetup({
   rawSetupState,
-  componentName,
+  uid,
+  name,
+  path,
   file,
   nodes,
   valNodeMap,
@@ -39,7 +41,7 @@ export function collectSetup({
           ? valNodeMap.get(storeVal as object)
           : undefined;
 
-      const componentNode = buildNode(key, trackedVal, componentName, file);
+      const componentNode = buildNode(key, trackedVal, uid, name, path, file);
       if (componentNode && storeNode) {
         linkNodes(storeNode, componentNode);
         storeValToComponentNode.set(storeVal as object, componentNode);
@@ -49,7 +51,7 @@ export function collectSetup({
       continue;
     }
 
-    const node = buildNode(key, trackedVal, componentName, file);
+    const node = buildNode(key, trackedVal, uid, name, path, file);
     if (node) {
       setValNode(valNodeMap, trackedVal, node);
       nodes.push(node);

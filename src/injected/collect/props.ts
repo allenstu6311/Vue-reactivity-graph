@@ -6,7 +6,7 @@ import { linkNodes } from "../subscribers/shared";
 // Strategy 2：sentinel dry-run 結果（ctx.instanceChildPropKeyMap.get(instance.parent)）
 // Strategy 3：v-bind 整包展開（由 traverseVNodeForSentinels Branch A 處理）
 export function collectProps(params: CollectPropsParams): void {
-  const { instance, componentName, file, nodes, ctx, propsOptions, parentRawSetupState } = params;
+  const { instance, uid, name, path, file, nodes, ctx, propsOptions, parentRawSetupState } = params;
 
   if (!propsOptions) return;
 
@@ -28,7 +28,10 @@ export function collectProps(params: CollectPropsParams): void {
 
   for (const propKey in propsOptions) {
     const propNode: GraphNode = {
-      id: `${componentName}.${propKey}`,
+      id: `${uid}.${propKey}`,
+      uid,
+      name,
+      path,
       varName: propKey,
       type: "prop",
       val: (instance.props as Record<string, unknown>)[propKey],

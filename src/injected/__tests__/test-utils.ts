@@ -7,7 +7,7 @@ import type { ExtendedComponentInstance } from '../../types/vue-internals'
 import { runScan } from '../walker'
 import { WalkContext } from '../context/WalkContext'
 import { getGraphData } from '../../graph'
-import type { GraphData } from '../../graph'
+import type { GraphData, GraphNode } from '../../graph'
 
 // Null renderer — 不需要 DOM，可在 Node.js 環境執行
 // 所有 host operations 皆為 no-op，元件 setup / reactivity 行為與 DOM renderer 完全相同
@@ -32,6 +32,43 @@ function clearGraph(): void {
   for (const key of Object.keys(g.stores)) {
     delete (g.stores as Record<string, unknown>)[key]
   }
+}
+
+/**
+ * 透過 path 查找 component nodes
+ * 例：getComponentNodes(graph, 'App.HomeView') 返回 path 為 'App.HomeView' 的節點陣列
+ */
+export function getComponentNodes(graph: GraphData, path: string): GraphNode[] {
+  for (const nodes of Object.values(graph.components)) {
+    if (nodes[0]?.path === path) {
+      return nodes
+    }
+  }
+  return []
+}
+
+/**
+ * 根據 path 和 varName 推導完整的 uid-based id
+ * 例：makeId(graph, 'App.HomeView', 'count') 返回 "12.count"
+ */
+export function makeId(graph: GraphData, path: string, varName: string): string {
+  const nodes = getComponentNodes(graph, path)
+  const sentinelNode = nodes[0]
+  if (sentinelNode && typeof sentinelNode.uid === 'number') {
+    return `${sentinelNode.uid}.${varName}`
+  }
+
+  // Fallback：試著在所有 components 中找同名的
+  const allNodes = Object.values(graph.components).flat()
+  const foundNode = allNodes.find(n => n.path === path && typeof n.uid === 'number')
+  if (foundNode) {
+    return `${foundNode.uid}.${varName}`
+  }
+
+  console.error('makeId failed for path:', path, 'Available:', {
+    allNodesSentinels: Object.values(graph.components).map(n => ({ path: n[0]?.path, uid: n[0]?.uid, type: n[0]?.type }))
+  })
+  throw new Error(`Cannot find component with path "${path}" or uid is missing.`)
 }
 
 /**

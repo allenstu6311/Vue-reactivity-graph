@@ -3,22 +3,22 @@ import type { GraphNode } from "../../graph";
 import { getGraphData } from "../../graph";
 import { linkNodes } from "../subscribers/shared";
 
-// DFS 時序契約：anonymous provide node 建立後直接寫入 getGraphData().components[parentComponentName!]。
-// 此陣列由父層 updateComponent(parentComponentName, nodes) 建立——DFS 保證父層 collectInstance
+// DFS 時序契約：anonymous provide node 建立後直接寫入 getGraphData().components[parent!.uid.toString()]。
+// 此陣列由父層 updateComponent(parent!.uid.toString(), nodes) 建立——DFS 保證父層 collectInstance
 // 完整執行完才輪到子層。
 //
 // 若順序被破壞（子層先於父層執行）：
-//   getGraphData().components[parentComponentName!] 為 undefined → ?.push() 靜默 no-op，不拋錯。
+//   getGraphData().components[parent!.uid.toString()] 為 undefined → ?.push() 靜默 no-op，不拋錯。
 //   anonymous node 不會進入父層 graph，但 valNodeMap 寫入仍成功（ctx.valNodeMap.set 正常執行）。
 //   後果：Phase 2 的 resolveDepNode 仍可從 valNodeMap 找到這個 node，
 //   但 DevTools panel 渲染的父層節點清單會缺少此 anonymous node——圖形不完整且難以察覺。
 //
 // anonymous node 建立後需同時執行三個寫入（維持現況行為）：
-//   1. getGraphData().components[parentComponentName!]?.push(parentNode)
+//   1. getGraphData().components[parent!.uid.toString()]?.push(parentNode)
 //   2. ctx.valNodeMap.set(lookupKey, parentNode)
 //   3. ctx.propSourceInjectMap.set(injectRaw, injectNode)
 export function collectInject(params: CollectInjectParams): Set<string> {
-  const { instance, componentName, parentComponentName, file, nodes, ctx, rawSetupState } = params;
+  const { instance, uid, name, path, parent, file, nodes, ctx, rawSetupState } = params;
 
   const injectKeySet = new Set<string>();
   const parentProvides = instance.parent?.provides;
@@ -51,7 +51,10 @@ export function collectInject(params: CollectInjectParams): Set<string> {
           ? `anonymous:${key.description ?? "symbol"}`
           : `anonymous:${String(key)}`;
       parentNode = {
-        id: `${parentComponentName}.${keyStr}`,
+        id: `${parent!.uid}.${keyStr}`,
+        uid: parent!.uid,
+        name: parentFile,
+        path: parent!.path,
         varName: "anonymous",
         type: (val as any).__v_isRef ? "ref" : "reactive",
         val: lookupKey,
@@ -59,7 +62,7 @@ export function collectInject(params: CollectInjectParams): Set<string> {
         deps: [],
         subs: [],
       };
-      getGraphData().components[parentComponentName!]?.push(parentNode);
+      getGraphData().components[parent!.uid.toString()]?.push(parentNode);
       ctx.valNodeMap.set(lookupKey, parentNode);
     }
 
@@ -75,7 +78,10 @@ export function collectInject(params: CollectInjectParams): Set<string> {
       if (!parentNode) continue;
       injectKeySet.add(childKey);
       const injectNode: GraphNode = {
-        id: `${componentName}.${childKey}`,
+        id: `${uid}.${childKey}`,
+        uid,
+        name,
+        path,
         varName: childKey,
         type: "inject",
         val: (val as any).__v_raw ?? val,

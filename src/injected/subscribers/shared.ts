@@ -1,7 +1,7 @@
 import type { GraphNode } from "../../graph/types"
 import { notifyUpdate } from "../../graph"
 import { resolveDepName, resolveDepNode } from "../helper/resolve"
-import type { TriggerContext } from "./types"
+import type { TrackContext } from "./types"
 import type { OnTrackEvent } from "../../types/vue-internals"
 
 export function linkNodes(
@@ -16,7 +16,7 @@ export function linkNodes(
 export function createOnTrackHandler(
   subNode: GraphNode,
   subId: string,
-  ctx: TriggerContext,
+  ctx: TrackContext | (TrackContext & { uid?: number; name?: string; path?: string }),
   options: { guardSelf?: boolean } = {},
 ): (event: OnTrackEvent) => void {
   return (event) => {

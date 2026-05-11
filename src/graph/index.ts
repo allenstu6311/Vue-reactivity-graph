@@ -22,6 +22,11 @@ export function updateStore(storeId: string, nodes: GraphNode[]): void {
   graph.stores[storeId] = nodes
 }
 
+export function clearGraph(): void {
+  graph.components = {}
+  graph.stores = {}
+}
+
 export function getGraphData(): GraphData {
   return graph
 }

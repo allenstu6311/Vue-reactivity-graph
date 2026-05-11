@@ -4,7 +4,9 @@ import type { WalkContext } from "../context/WalkContext"
 
 export interface CollectPropsParams {
   instance: ExtendedComponentInstance
-  componentName: string
+  uid: number
+  name: string
+  path: string
   file: string
   nodes: GraphNode[]
   ctx: WalkContext
@@ -17,8 +19,10 @@ export interface CollectPropsParams {
 
 export interface CollectInjectParams {
   instance: ExtendedComponentInstance
-  componentName: string
-  parentComponentName: string | undefined
+  uid: number
+  name: string
+  path: string
+  parent?: { uid: number; path: string }
   file: string
   nodes: GraphNode[]
   ctx: WalkContext
@@ -27,7 +31,9 @@ export interface CollectInjectParams {
 
 export interface CollectSetupParams {
   rawSetupState: Record<string, unknown>
-  componentName: string
+  uid: number
+  name: string
+  path: string
   file: string
   nodes: GraphNode[]
   valNodeMap: WeakMap<object, GraphNode>   // 直接傳入，不包進 ctx
@@ -37,7 +43,9 @@ export interface CollectSetupParams {
 
 export interface CollectWatchParams {
   instance: ExtendedComponentInstance
-  componentName: string
+  uid: number
+  name: string
+  path: string
   file: string
   nodes: GraphNode[]
   watchEffects: WatchEffect[]

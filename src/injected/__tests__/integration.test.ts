@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest'
 import { defineComponent, ref, computed, provide, inject, h } from 'vue'
 import { defineStore, storeToRefs, createPinia } from 'pinia'
-import { runWalker } from './test-utils'
+import { runWalker, getComponentNodes, makeId } from './test-utils'
 import type { GraphNode } from '../../graph'
 
 function pick(node: GraphNode) {
@@ -126,42 +126,42 @@ describe('Phase 5 — 跨系統整合情境', () => {
   describe('情境 ① inject → prop', () => {
     it('Child prop node.deps 指向 Receiver inject node id', () => {
       const graph = runWalker(InjPropProvider)
-      const childValue = graph.components['InjPropProvider.InjPropReceiver.InjPropChild']
+      const childValue = getComponentNodes(graph, 'InjPropProvider.InjPropReceiver.InjPropChild')
         .find(n => n.varName === 'value')!
 
       expect(pick(childValue)).toStrictEqual({
-        id: 'InjPropProvider.InjPropReceiver.InjPropChild.value',
+        id: makeId(graph, 'InjPropProvider.InjPropReceiver.InjPropChild', 'value'),
         varName: 'value',
         type: 'prop',
-        deps: ['InjPropProvider.InjPropReceiver.num'],
+        deps: [makeId(graph, 'InjPropProvider.InjPropReceiver', 'num')],
         subs: [],
       })
     })
 
     it('Provider ref node.subs 包含 Receiver inject node id', () => {
       const graph = runWalker(InjPropProvider)
-      const providerNum = graph.components['InjPropProvider'].find(n => n.varName === 'num')!
+      const providerNum = getComponentNodes(graph, 'InjPropProvider').find(n => n.varName === 'num')!
 
       expect(pick(providerNum)).toStrictEqual({
-        id: 'InjPropProvider.num',
+        id: makeId(graph, 'InjPropProvider', 'num'),
         varName: 'num',
         type: 'ref',
         deps: [],
-        subs: ['InjPropProvider.InjPropReceiver.num'],
+        subs: [makeId(graph, 'InjPropProvider.InjPropReceiver', 'num')],
       })
     })
 
     it('Receiver inject node.subs 包含 Child prop node id', () => {
       const graph = runWalker(InjPropProvider)
-      const receiverNum = graph.components['InjPropProvider.InjPropReceiver']
+      const receiverNum = getComponentNodes(graph, 'InjPropProvider.InjPropReceiver')
         .find(n => n.varName === 'num')!
 
       expect(pick(receiverNum)).toStrictEqual({
-        id: 'InjPropProvider.InjPropReceiver.num',
+        id: makeId(graph, 'InjPropProvider.InjPropReceiver', 'num'),
         varName: 'num',
         type: 'inject',
-        deps: ['InjPropProvider.num'],
-        subs: ['InjPropProvider.InjPropReceiver.InjPropChild.value'],
+        deps: [makeId(graph, 'InjPropProvider', 'num')],
+        subs: [makeId(graph, 'InjPropProvider.InjPropReceiver.InjPropChild', 'value')],
       })
     })
   })
@@ -169,43 +169,43 @@ describe('Phase 5 — 跨系統整合情境', () => {
   describe('情境 ② prop → computed → prop', () => {
     it('Child prop node.deps 指向 Parent computed node id', () => {
       const graph = runWalker(PcpGrandParent)
-      const childValue = graph.components['PcpGrandParent.PcpParent.PcpChild']
+      const childValue = getComponentNodes(graph, 'PcpGrandParent.PcpParent.PcpChild')
         .find(n => n.varName === 'value')!
 
       expect(pick(childValue)).toStrictEqual({
-        id: 'PcpGrandParent.PcpParent.PcpChild.value',
+        id: makeId(graph, 'PcpGrandParent.PcpParent.PcpChild', 'value'),
         varName: 'value',
         type: 'prop',
-        deps: ['PcpGrandParent.PcpParent.double'],
+        deps: [makeId(graph, 'PcpGrandParent.PcpParent', 'double')],
         subs: [],
       })
     })
 
     it('Parent computed node.deps 包含 Parent prop node id，subs 包含 Child prop node id', () => {
       const graph = runWalker(PcpGrandParent)
-      const parentDouble = graph.components['PcpGrandParent.PcpParent']
+      const parentDouble = getComponentNodes(graph, 'PcpGrandParent.PcpParent')
         .find(n => n.varName === 'double')!
 
       expect(pick(parentDouble)).toStrictEqual({
-        id: 'PcpGrandParent.PcpParent.double',
+        id: makeId(graph, 'PcpGrandParent.PcpParent', 'double'),
         varName: 'double',
         type: 'computed',
-        deps: ['PcpGrandParent.PcpParent.count'],
-        subs: ['PcpGrandParent.PcpParent.PcpChild.value'],
+        deps: [makeId(graph, 'PcpGrandParent.PcpParent', 'count')],
+        subs: [makeId(graph, 'PcpGrandParent.PcpParent.PcpChild', 'value')],
       })
     })
 
     it('Parent prop node.subs 包含 Parent computed node id', () => {
       const graph = runWalker(PcpGrandParent)
-      const parentCount = graph.components['PcpGrandParent.PcpParent']
+      const parentCount = getComponentNodes(graph, 'PcpGrandParent.PcpParent')
         .find(n => n.varName === 'count')!
 
       expect(pick(parentCount)).toStrictEqual({
-        id: 'PcpGrandParent.PcpParent.count',
+        id: makeId(graph, 'PcpGrandParent.PcpParent', 'count'),
         varName: 'count',
         type: 'prop',
-        deps: ['PcpGrandParent.count'],
-        subs: ['PcpGrandParent.PcpParent.double'],
+        deps: [makeId(graph, 'PcpGrandParent', 'count')],
+        subs: [makeId(graph, 'PcpGrandParent.PcpParent', 'double')],
       })
     })
   })
@@ -213,48 +213,48 @@ describe('Phase 5 — 跨系統整合情境', () => {
   describe('情境 ③ provide → inject → computed → prop（三層鏈）', () => {
     it('Provider ref → inject node 互連', () => {
       const graph = runWalker(ChainProvider)
-      const providerBase = graph.components['ChainProvider'].find(n => n.varName === 'base')!
-      const middleBase = graph.components['ChainProvider.ChainMiddle'].find(n => n.varName === 'base')!
+      const providerBase = getComponentNodes(graph, 'ChainProvider').find(n => n.varName === 'base')!
+      const middleBase = getComponentNodes(graph, 'ChainProvider.ChainMiddle').find(n => n.varName === 'base')!
 
       expect(pick(providerBase)).toStrictEqual({
-        id: 'ChainProvider.base',
+        id: makeId(graph, 'ChainProvider', 'base'),
         varName: 'base',
         type: 'ref',
         deps: [],
-        subs: ['ChainProvider.ChainMiddle.base'],
+        subs: [makeId(graph, 'ChainProvider.ChainMiddle', 'base')],
       })
       expect(pick(middleBase)).toStrictEqual({
-        id: 'ChainProvider.ChainMiddle.base',
+        id: makeId(graph, 'ChainProvider.ChainMiddle', 'base'),
         varName: 'base',
         type: 'inject',
-        deps: ['ChainProvider.base'],
-        subs: ['ChainProvider.ChainMiddle.doubled'],
+        deps: [makeId(graph, 'ChainProvider', 'base')],
+        subs: [makeId(graph, 'ChainProvider.ChainMiddle', 'doubled')],
       })
     })
 
     it('inject node → computed node 互連', () => {
       const graph = runWalker(ChainProvider)
-      const middleDoubled = graph.components['ChainProvider.ChainMiddle'].find(n => n.varName === 'doubled')!
+      const middleDoubled = getComponentNodes(graph, 'ChainProvider.ChainMiddle').find(n => n.varName === 'doubled')!
 
       expect(pick(middleDoubled)).toStrictEqual({
-        id: 'ChainProvider.ChainMiddle.doubled',
+        id: makeId(graph, 'ChainProvider.ChainMiddle', 'doubled'),
         varName: 'doubled',
         type: 'computed',
-        deps: ['ChainProvider.ChainMiddle.base'],
-        subs: ['ChainProvider.ChainMiddle.ChainLeaf.result'],
+        deps: [makeId(graph, 'ChainProvider.ChainMiddle', 'base')],
+        subs: [makeId(graph, 'ChainProvider.ChainMiddle.ChainLeaf', 'result')],
       })
     })
 
     it('computed node → Leaf prop node 互連', () => {
       const graph = runWalker(ChainProvider)
-      const leafResult = graph.components['ChainProvider.ChainMiddle.ChainLeaf']
+      const leafResult = getComponentNodes(graph, 'ChainProvider.ChainMiddle.ChainLeaf')
         .find(n => n.varName === 'result')!
 
       expect(pick(leafResult)).toStrictEqual({
-        id: 'ChainProvider.ChainMiddle.ChainLeaf.result',
+        id: makeId(graph, 'ChainProvider.ChainMiddle.ChainLeaf', 'result'),
         varName: 'result',
         type: 'prop',
-        deps: ['ChainProvider.ChainMiddle.doubled'],
+        deps: [makeId(graph, 'ChainProvider.ChainMiddle', 'doubled')],
         subs: [],
       })
     })
@@ -263,13 +263,13 @@ describe('Phase 5 — 跨系統整合情境', () => {
   describe('情境 ④ Pinia store ref → prop', () => {
     it('PiniaChild prop node.deps 指向 component wrapper node（非 store node）', () => {
       const graph = runWalker(PiniaParent, [createPinia()])
-      const childValue = graph.components['PiniaParent.PiniaChild'].find(n => n.varName === 'value')!
+      const childValue = getComponentNodes(graph, 'PiniaParent.PiniaChild').find(n => n.varName === 'value')!
 
       expect(pick(childValue)).toStrictEqual({
-        id: 'PiniaParent.PiniaChild.value',
+        id: makeId(graph, 'PiniaParent.PiniaChild', 'value'),
         varName: 'value',
         type: 'prop',
-        deps: ['PiniaParent.count'],
+        deps: [makeId(graph, 'PiniaParent', 'count')],
         subs: [],
       })
       expect(childValue.deps).not.toContain('integration.count')
@@ -277,9 +277,9 @@ describe('Phase 5 — 跨系統整合情境', () => {
 
     it('PiniaParent count wrapper node.subs 包含 PiniaChild prop node id', () => {
       const graph = runWalker(PiniaParent, [createPinia()])
-      const wrapperCount = graph.components['PiniaParent'].find(n => n.id === 'PiniaParent.count')!
+      const wrapperCount = getComponentNodes(graph, 'PiniaParent').find(n => n.id === makeId(graph, 'PiniaParent', 'count'))!
 
-      expect(wrapperCount.subs).toContain('PiniaParent.PiniaChild.value')
+      expect(wrapperCount.subs).toContain(makeId(graph, 'PiniaParent.PiniaChild', 'value'))
     })
   })
 })

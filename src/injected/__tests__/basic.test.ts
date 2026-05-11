@@ -3,7 +3,7 @@
 // 驗收標準見 TEST_PLAN.md Phase 1
 import { describe, it, expect } from 'vitest'
 import { defineComponent, ref, reactive, computed, watch, h } from 'vue'
-import { runWalker } from './test-utils'
+import { runWalker, getComponentNodes, makeId } from './test-utils'
 import type { GraphNode } from '../../graph'
 
 // ── 主測試元件（對應 TEST_PLAN.md Phase 1）────────────────────────────────
@@ -33,72 +33,73 @@ function pick(node: GraphNode) {
 describe('Phase 1 — 單一元件基礎驗證', () => {
   it('建立正確數量的節點並連線 deps / subs', () => {
     const graph = runWalker(TestComp)
-    const nodes = graph.components['TestComp']
+    const nodes = getComponentNodes(graph, 'TestComp')
     expect(nodes).toBeDefined()
-    expect(nodes).toHaveLength(7)
+    // 節點數量：sentinel (component) + count (ref) + items (reactive) + double (computed) + label (computed) + listLen (computed) + w_0 (watch) + w_1 (watch) = 8
+    expect(nodes).toHaveLength(8)
 
     const get = (varName: string) => nodes.find(n => n.varName === varName)!
 
     // ref: count
     expect(pick(get('count'))).toStrictEqual({
-      id: 'TestComp.count',
+      id: makeId(graph, 'TestComp', 'count'),
       varName: 'count',
       type: 'ref',
       deps: [],
-      subs: ['TestComp.double', 'TestComp.w_0'],
+      subs: [makeId(graph, 'TestComp', 'double'), makeId(graph, 'TestComp', 'w_0')],
     })
 
     // reactive: items
     expect(pick(get('items'))).toStrictEqual({
-      id: 'TestComp.items',
+      id: makeId(graph, 'TestComp', 'items'),
       varName: 'items',
       type: 'reactive',
       deps: [],
-      subs: ['TestComp.listLen'],
+      subs: [makeId(graph, 'TestComp', 'listLen')],
     })
 
     // computed: double（讀 ref）
     expect(pick(get('double'))).toStrictEqual({
-      id: 'TestComp.double',
+      id: makeId(graph, 'TestComp', 'double'),
       varName: 'double',
       type: 'computed',
-      deps: ['TestComp.count'],
-      subs: ['TestComp.label', 'TestComp.w_1'],
+      deps: [makeId(graph, 'TestComp', 'count')],
+      subs: [makeId(graph, 'TestComp', 'label'), makeId(graph, 'TestComp', 'w_1')],
     })
 
     // computed: label（讀 computed — chain）
     expect(pick(get('label'))).toStrictEqual({
-      id: 'TestComp.label',
+      id: makeId(graph, 'TestComp', 'label'),
       varName: 'label',
       type: 'computed',
-      deps: ['TestComp.double'],
+      deps: [makeId(graph, 'TestComp', 'double')],
       subs: [],
     })
 
     // computed: listLen（讀 reactive）
     expect(pick(get('listLen'))).toStrictEqual({
-      id: 'TestComp.listLen',
+      id: makeId(graph, 'TestComp', 'listLen'),
       varName: 'listLen',
       type: 'computed',
-      deps: ['TestComp.items'],
+      deps: [makeId(graph, 'TestComp', 'items')],
       subs: [],
     })
 
     // watch: w_0（監聽 ref）
     expect(pick(get('w_0'))).toStrictEqual({
-      id: 'TestComp.w_0',
+      id: makeId(graph, 'TestComp', 'w_0'),
       varName: 'w_0',
       type: 'watch',
-      deps: ['TestComp.count'],
+      deps: [makeId(graph, 'TestComp', 'count')],
       subs: [],
     })
 
     // watch: w_1（監聽 computed）
     expect(pick(get('w_1'))).toStrictEqual({
-      id: 'TestComp.w_1',
+      id: makeId(graph, 'TestComp', 'w_1'),
       varName: 'w_1',
       type: 'watch',
-      deps: ['TestComp.double'],
+      deps: [makeId(graph, 'TestComp', 'double')],
       subs: [],
     })
   })
@@ -115,10 +116,11 @@ describe('Phase 1 — 單一元件基礎驗證', () => {
     })
 
     const graph = runWalker(DupComp)
-    const sumTwice = graph.components['DupComp'].find(n => n.varName === 'sumTwice')!
+    const nodes = getComponentNodes(graph, 'DupComp')
+    const sumTwice = nodes.find(n => n.varName === 'sumTwice')!
 
-    expect(sumTwice.deps).toStrictEqual(['DupComp.count'])
-    expect(graph.components['DupComp'].find(n => n.varName === 'count')!.subs).toStrictEqual(['DupComp.sumTwice'])
+    expect(sumTwice.deps).toStrictEqual([makeId(graph, 'DupComp', 'count')])
+    expect(nodes.find(n => n.varName === 'count')!.subs).toStrictEqual([makeId(graph, 'DupComp', 'sumTwice')])
   })
 
   it('無訂閱者的 ref，subs 為空陣列', () => {
@@ -132,7 +134,8 @@ describe('Phase 1 — 單一元件基礎驗證', () => {
     })
 
     const graph = runWalker(UnusedComp)
-    const unused = graph.components['UnusedComp'].find(n => n.varName === 'unused')!
+    const nodes = getComponentNodes(graph, 'UnusedComp')
+    const unused = nodes.find(n => n.varName === 'unused')!
 
     expect(unused).toBeDefined()
     expect(unused.subs).toStrictEqual([])

@@ -5,7 +5,7 @@
 // 驗收標準見 TEST_PLAN.md Phase 4
 import { describe, it, expect } from 'vitest'
 import { defineComponent, ref, reactive, provide, inject, computed, watch, readonly, h } from 'vue'
-import { runWalker } from './test-utils'
+import { runWalker, getComponentNodes, makeId } from './test-utils'
 import type { GraphNode } from '../../graph'
 
 function pick(node: GraphNode) {
@@ -172,155 +172,170 @@ const WatchProvider = defineComponent({
 describe('Phase 4 — Provide / Inject', () => {
   it('inject ref：inject node 連回父層 ref，deps / subs 互連', () => {
     const graph = runWalker(ProviderComp)
-    const get = (key: string, varName: string) => graph.components[key].find(n => n.varName === varName)!
+    const get = (path: string, varName: string) => getComponentNodes(graph, path).find(n => n.varName === varName)!
 
-    expect(pick(get('ProviderComp', 'num'))).toStrictEqual({
-      id: 'ProviderComp.num',
+    const providerNum = get('ProviderComp', 'num')
+    expect(pick(providerNum)).toStrictEqual({
+      id: makeId(graph, 'ProviderComp', 'num'),
       varName: 'num',
       type: 'ref',
       deps: [],
-      subs: ['ProviderComp.ReceiverComp.num'],
+      subs: [makeId(graph, 'ProviderComp.ReceiverComp', 'num')],
     })
 
-    expect(pick(get('ProviderComp.ReceiverComp', 'num'))).toStrictEqual({
-      id: 'ProviderComp.ReceiverComp.num',
+    const receiverNum = get('ProviderComp.ReceiverComp', 'num')
+    expect(pick(receiverNum)).toStrictEqual({
+      id: makeId(graph, 'ProviderComp.ReceiverComp', 'num'),
       varName: 'num',
       type: 'inject',
-      deps: ['ProviderComp.num'],
+      deps: [makeId(graph, 'ProviderComp', 'num')],
       subs: [],
     })
   })
 
   it('兩子元件 inject 同一 provide：各自建立獨立 inject node，父層 subs 包含兩者，不互蓋', () => {
     const graph = runWalker(SiblingProvider)
-    const get = (key: string, varName: string) => graph.components[key].find(n => n.varName === varName)!
+    const get = (path: string, varName: string) => getComponentNodes(graph, path).find(n => n.varName === varName)!
 
-    expect(pick(get('SiblingProvider', 'val'))).toStrictEqual({
-      id: 'SiblingProvider.val',
+    const providerVal = get('SiblingProvider', 'val')
+    expect(pick(providerVal)).toStrictEqual({
+      id: makeId(graph, 'SiblingProvider', 'val'),
       varName: 'val',
       type: 'ref',
       deps: [],
-      subs: ['SiblingProvider.SiblingReceiverA.val', 'SiblingProvider.SiblingReceiverB.val'],
+      subs: [makeId(graph, 'SiblingProvider.SiblingReceiverA', 'val'), makeId(graph, 'SiblingProvider.SiblingReceiverB', 'val')],
     })
 
-    expect(pick(get('SiblingProvider.SiblingReceiverA', 'val'))).toStrictEqual({
-      id: 'SiblingProvider.SiblingReceiverA.val',
+    const siblingAVal = get('SiblingProvider.SiblingReceiverA', 'val')
+    expect(pick(siblingAVal)).toStrictEqual({
+      id: makeId(graph, 'SiblingProvider.SiblingReceiverA', 'val'),
       varName: 'val',
       type: 'inject',
-      deps: ['SiblingProvider.val'],
+      deps: [makeId(graph, 'SiblingProvider', 'val')],
       subs: [],
     })
 
-    expect(pick(get('SiblingProvider.SiblingReceiverB', 'val'))).toStrictEqual({
-      id: 'SiblingProvider.SiblingReceiverB.val',
+    const siblingBVal = get('SiblingProvider.SiblingReceiverB', 'val')
+    expect(pick(siblingBVal)).toStrictEqual({
+      id: makeId(graph, 'SiblingProvider.SiblingReceiverB', 'val'),
       varName: 'val',
       type: 'inject',
-      deps: ['SiblingProvider.val'],
+      deps: [makeId(graph, 'SiblingProvider', 'val')],
       subs: [],
     })
   })
 
   it('inject 被 computed 讀取：computed.deps 包含 inject node id，inject node.subs 包含 computed node id', () => {
     const graph = runWalker(ComputedProvider)
-    const get = (key: string, varName: string) => graph.components[key].find(n => n.varName === varName)!
+    const get = (path: string, varName: string) => getComponentNodes(graph, path).find(n => n.varName === varName)!
 
-    expect(pick(get('ComputedProvider.ComputedConsumer', 'base'))).toStrictEqual({
-      id: 'ComputedProvider.ComputedConsumer.base',
+    const consumerBase = get('ComputedProvider.ComputedConsumer', 'base')
+    expect(pick(consumerBase)).toStrictEqual({
+      id: makeId(graph, 'ComputedProvider.ComputedConsumer', 'base'),
       varName: 'base',
       type: 'inject',
-      deps: ['ComputedProvider.base'],
-      subs: ['ComputedProvider.ComputedConsumer.double'],
+      deps: [makeId(graph, 'ComputedProvider', 'base')],
+      subs: [makeId(graph, 'ComputedProvider.ComputedConsumer', 'double')],
     })
 
-    expect(pick(get('ComputedProvider.ComputedConsumer', 'double'))).toStrictEqual({
-      id: 'ComputedProvider.ComputedConsumer.double',
+    const consumerDouble = get('ComputedProvider.ComputedConsumer', 'double')
+    expect(pick(consumerDouble)).toStrictEqual({
+      id: makeId(graph, 'ComputedProvider.ComputedConsumer', 'double'),
       varName: 'double',
       type: 'computed',
-      deps: ['ComputedProvider.ComputedConsumer.base'],
+      deps: [makeId(graph, 'ComputedProvider.ComputedConsumer', 'base')],
       subs: [],
     })
   })
 
   it('inject 被 watch 讀取：w_0.deps 包含 inject node id', () => {
     const graph = runWalker(WatchProvider)
-    const get = (key: string, varName: string) => graph.components[key].find(n => n.varName === varName)!
+    const get = (path: string, varName: string) => getComponentNodes(graph, path).find(n => n.varName === varName)!
 
-    expect(pick(get('WatchProvider.WatchConsumer', 'count'))).toStrictEqual({
-      id: 'WatchProvider.WatchConsumer.count',
+    const watchConsumerCount = get('WatchProvider.WatchConsumer', 'count')
+    expect(pick(watchConsumerCount)).toStrictEqual({
+      id: makeId(graph, 'WatchProvider.WatchConsumer', 'count'),
       varName: 'count',
       type: 'inject',
-      deps: ['WatchProvider.count'],
-      subs: ['WatchProvider.WatchConsumer.w_0'],
+      deps: [makeId(graph, 'WatchProvider', 'count')],
+      subs: [makeId(graph, 'WatchProvider.WatchConsumer', 'w_0')],
     })
 
-    expect(pick(get('WatchProvider.WatchConsumer', 'w_0'))).toStrictEqual({
-      id: 'WatchProvider.WatchConsumer.w_0',
+    const watchConsumerW0 = get('WatchProvider.WatchConsumer', 'w_0')
+    expect(pick(watchConsumerW0)).toStrictEqual({
+      id: makeId(graph, 'WatchProvider.WatchConsumer', 'w_0'),
       varName: 'w_0',
       type: 'watch',
-      deps: ['WatchProvider.WatchConsumer.count'],
+      deps: [makeId(graph, 'WatchProvider.WatchConsumer', 'count')],
       subs: [],
     })
   })
 
   it('provide readonly(ref(...))：inject node 連回父層 ref，deps / subs 互連', () => {
     const graph = runWalker(ReadonlyProvider)
-    const get = (key: string, varName: string) => graph.components[key].find(n => n.varName === varName)!
+    const get = (path: string, varName: string) => getComponentNodes(graph, path).find(n => n.varName === varName)!
 
-    expect(pick(get('ReadonlyProvider', 'count'))).toStrictEqual({
-      id: 'ReadonlyProvider.count',
+    const readonlyProviderCount = get('ReadonlyProvider', 'count')
+    expect(pick(readonlyProviderCount)).toStrictEqual({
+      id: makeId(graph, 'ReadonlyProvider', 'count'),
       varName: 'count',
       type: 'ref',
       deps: [],
-      subs: ['ReadonlyProvider.ReadonlyReceiver.count'],
+      subs: [makeId(graph, 'ReadonlyProvider.ReadonlyReceiver', 'count')],
     })
 
-    expect(pick(get('ReadonlyProvider.ReadonlyReceiver', 'count'))).toStrictEqual({
-      id: 'ReadonlyProvider.ReadonlyReceiver.count',
+    const readonlyReceiverCount = get('ReadonlyProvider.ReadonlyReceiver', 'count')
+    expect(pick(readonlyReceiverCount)).toStrictEqual({
+      id: makeId(graph, 'ReadonlyProvider.ReadonlyReceiver', 'count'),
       varName: 'count',
       type: 'inject',
-      deps: ['ReadonlyProvider.count'],
+      deps: [makeId(graph, 'ReadonlyProvider', 'count')],
       subs: [],
     })
   })
 
   it('Symbol key provide / inject：inject node 連回父層 ref，deps / subs 互連', () => {
     const graph = runWalker(SymbolProvider)
-    const get = (key: string, varName: string) => graph.components[key].find(n => n.varName === varName)!
+    const get = (path: string, varName: string) => getComponentNodes(graph, path).find(n => n.varName === varName)!
 
-    expect(pick(get('SymbolProvider', 'count'))).toStrictEqual({
-      id: 'SymbolProvider.count',
+    const symbolProviderCount = get('SymbolProvider', 'count')
+    expect(pick(symbolProviderCount)).toStrictEqual({
+      id: makeId(graph, 'SymbolProvider', 'count'),
       varName: 'count',
       type: 'ref',
       deps: [],
-      subs: ['SymbolProvider.SymbolReceiver.count'],
+      subs: [makeId(graph, 'SymbolProvider.SymbolReceiver', 'count')],
     })
 
-    expect(pick(get('SymbolProvider.SymbolReceiver', 'count'))).toStrictEqual({
-      id: 'SymbolProvider.SymbolReceiver.count',
+    const symbolReceiverCount = get('SymbolProvider.SymbolReceiver', 'count')
+    expect(pick(symbolReceiverCount)).toStrictEqual({
+      id: makeId(graph, 'SymbolProvider.SymbolReceiver', 'count'),
       varName: 'count',
       type: 'inject',
-      deps: ['SymbolProvider.count'],
+      deps: [makeId(graph, 'SymbolProvider', 'count')],
       subs: [],
     })
   })
 
   it('provide reactive proxy：inject node 連回父層 reactive，deps / subs 互連', () => {
     const graph = runWalker(ReactiveProvider)
-    const get = (key: string, varName: string) => graph.components[key].find(n => n.varName === varName)!
+    const get = (path: string, varName: string) => getComponentNodes(graph, path).find(n => n.varName === varName)!
 
-    expect(pick(get('ReactiveProvider', 'config'))).toStrictEqual({
-      id: 'ReactiveProvider.config',
+    const reactiveProviderConfig = get('ReactiveProvider', 'config')
+    expect(pick(reactiveProviderConfig)).toStrictEqual({
+      id: makeId(graph, 'ReactiveProvider', 'config'),
       varName: 'config',
       type: 'reactive',
       deps: [],
-      subs: ['ReactiveProvider.ReactiveReceiver.config'],
+      subs: [makeId(graph, 'ReactiveProvider.ReactiveReceiver', 'config')],
     })
 
-    expect(pick(get('ReactiveProvider.ReactiveReceiver', 'config'))).toStrictEqual({
-      id: 'ReactiveProvider.ReactiveReceiver.config',
+    const reactiveReceiverConfig = get('ReactiveProvider.ReactiveReceiver', 'config')
+    expect(pick(reactiveReceiverConfig)).toStrictEqual({
+      id: makeId(graph, 'ReactiveProvider.ReactiveReceiver', 'config'),
       varName: 'config',
       type: 'inject',
-      deps: ['ReactiveProvider.config'],
+      deps: [makeId(graph, 'ReactiveProvider', 'config')],
       subs: [],
     })
   })

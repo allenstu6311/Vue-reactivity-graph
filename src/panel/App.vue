@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import VariableList from './components/VariableList.vue'
 import GraphView from './components/GraphView.vue'
+import ComponentTree from './components/ComponentTree.vue'
 import type { GraphData } from '../graph'
 import { useGraphFetcher } from './composables/useGraphFetcher'
 import { useDevtoolsConnection } from './composables/useDevtoolsConnection'
@@ -9,22 +10,18 @@ import { TAB } from './tabs'
 import type { Tab } from './tabs'
 
 const graph = ref<GraphData>({ components: {}, stores: {} })
-const selectedComponentName = ref<string>('')
+const selectedUid = ref<string>('')
 const selectedId = ref<string | null>(null)
 const activeTab = ref<Tab>(TAB.Components)
 
-const componentKeys = computed(() => Object.keys(graph.value.components))
-const currentNodes = computed(() => graph.value.components[selectedComponentName.value] ?? [])
+const currentNodes = computed(() => graph.value.components[selectedUid.value] ?? [])
 const allNodes = computed(() => [
   ...Object.values(graph.value.components).flat(),
   ...Object.values(graph.value.stores).flat(),
 ])
-const storeIds = computed(() =>
-  Object.keys(graph.value.stores).sort()
-)
 
-function onSelectComponent(comp: string) {
-  selectedComponentName.value = comp
+function onSelectComponent(uid: string) {
+  selectedUid.value = uid
   selectedId.value = null
 }
 
@@ -38,8 +35,8 @@ async function handleFetchGraph() {
   const result = await fetchGraph()
   if (!result) return
   graph.value = result
-  if (!selectedComponentName.value || !result.components[selectedComponentName.value]) {
-    selectedComponentName.value = Object.keys(result.components)[0] ?? ''
+  if (!selectedUid.value || !result.components[selectedUid.value]) {
+    selectedUid.value = Object.keys(result.components)[0] ?? ''
   }
 }
 
@@ -67,26 +64,17 @@ onMounted(() => {
 
         <!-- Selector row -->
         <div class="comp-select-wrap">
-          <div class="select-row" v-if="activeTab === TAB.Components">
-            <select
-              class="comp-select"
-              :value="selectedComponentName"
-              @change="onSelectComponent(($event.target as HTMLSelectElement).value)"
-            >
-              <option v-for="key in componentKeys" :key="key" :value="key">
-                {{ graph.components[key][0]?.file ?? key }}.vue
-              </option>
-            </select>
-            <button class="refresh-btn" title="Refresh" @click="handleFetchGraph">↺</button>
-          </div>
-          <div class="select-row" v-else>
-            <select class="comp-select" disabled>
-              <option value=""></option>
-              <option v-for="id in storeIds" :key="id" :value="id">{{ id }}</option>
-            </select>
+          <div class="select-row">
             <button class="refresh-btn" title="Refresh" @click="handleFetchGraph">↺</button>
           </div>
         </div>
+
+        <ComponentTree
+          v-if="activeTab === TAB.Components"
+          :graph="graph"
+          :selected-uid="selectedUid"
+          @select="onSelectComponent"
+        />
 
         <VariableList
           :nodes="activeTab === TAB.Components ? currentNodes : Object.values(graph.stores).flat()"
