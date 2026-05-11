@@ -25,6 +25,7 @@ export function bindComputedTrack({
 
     if (computedImpl?.effect) {
       const subNode = valNodeMap.get(computedImpl as object)
+      // skip store-owned computed — they belong to Pinia, not this component
       if (!subNode || subNode.type === "store") continue
 
       computedImpl.onTrack = createOnTrackHandler(subNode, subNode.id, {

@@ -61,7 +61,7 @@ if (app) {
         ]),
       ),
     };
-
+    console.log("Updating graph data:", plain);
     (window as unknown as Record<string, unknown>).__vueReactivityGraph = plain;
     window.postMessage({ type: "VUE_GRAPH_UPDATE" }, "*");
   }

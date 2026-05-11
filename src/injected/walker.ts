@@ -106,15 +106,13 @@ export function triggerInstance({
 
   const nodes = getGraphData().components[key] ?? [];
 
-  // per-component inject lookup：raw → injectNode，供 Phase 2 onTrack resolveDepNode 使用
-  // 每次 triggerInstance 重建：A、B 兩個兄弟 component 若 inject 同一個 provide 值（同一 raw object），
-  // 共用全域 Map 會互蓋，導致 A 的 onTrack 查到 B 的 injectNode，連線接錯對象
+  // 每次 triggerInstance 重建，避免兄弟 component inject 同一個值時，A 的追蹤連到 B 的節點
   const injectRawToLocalNode = new Map<object, GraphNode>();
   for (const node of nodes) {
     if (node.type !== "inject") continue;
     const raw = (node.val as any)?.__v_raw ?? node.val;
     if (raw && typeof raw === "object") {
-      injectRawToLocalNode.set(raw as object, node);
+      injectRawToLocalNode.set(raw, node);
     }
   }
 
@@ -128,9 +126,9 @@ export function triggerInstance({
     if (!isStoreToRefsRef(val)) continue;
     const storeRaw = (val as any)._object?.__v_raw ?? (val as any)._object;
     const storeVal = storeRaw?.[(val as any)._key];
-    const componentNode = ctx.valNodeMap.get(val as object);
+    const componentNode = ctx.valNodeMap.get(val);
     if (storeVal && typeof storeVal === "object" && componentNode) {
-      storeValToComponentNode.set(storeVal as object, componentNode);
+      storeValToComponentNode.set(storeVal, componentNode);
     }
   }
   if (rawSetupState) {

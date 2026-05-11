@@ -22,7 +22,7 @@ export function collectSetup({
 }: CollectSetupParams): void {
   for (const key in rawSetupState) {
     if (key === "props") continue;
-    if (skipKeys?.has(key)) continue;
+    if (skipKeys?.has(key)) continue; // inject keys — already built by collectInject
     const val = rawSetupState[key];
 
     if (typeof val !== "object" || val === null) continue;

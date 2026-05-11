@@ -1,4 +1,5 @@
 import type { GraphNode } from "../../graph";
+import { ReactiveTarget } from "../../types/vue-internals";
 import type { ResolveDepNodeParams } from "./types";
 
 export function isPiniaStoreProxy(val: unknown): boolean {
@@ -16,7 +17,7 @@ export function isStoreToRefsRef(val: unknown): boolean {
 }
 
 export function resolveDepName(
-  target: object,
+  target: ReactiveTarget,
   key: string | symbol,
   propKeyNodeMap: WeakMap<object, Map<string, GraphNode>>,
   valNodeMap: WeakMap<object, GraphNode>,

@@ -20,11 +20,11 @@ export function createOnTrackHandler(
   options: { guardSelf?: boolean } = {},
 ): (event: OnTrackEvent) => void {
   return (event) => {
-    const depName = resolveDepName(event.target as object, event.key, ctx.propKeyNodeMap, ctx.valNodeMap)
+    const depName = resolveDepName(event.target, event.key, ctx.propKeyNodeMap, ctx.valNodeMap)
     if (!depName) return
 
     const depNode = resolveDepNode({
-      target: event.target as object,
+      target: event.target,
       key: event.key,
       depName,
       rawSetupState: ctx.rawSetupState,

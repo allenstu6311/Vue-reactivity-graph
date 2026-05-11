@@ -32,8 +32,8 @@ export function collectInject(params: CollectInjectParams): Set<string> {
     ...Object.getOwnPropertySymbols(parentProvides as object),
   ];
   const parentFile =
-    ((instance.parent?.type as any)?.__name as string) ||
-    ((instance.parent?.type as any)?.name as string) ||
+    (instance.parent?.type?.__name as string) ||
+    (instance.parent?.type?.name as string) ||
     "Anonymous";
 
   for (const key of provideKeys) {
@@ -66,7 +66,7 @@ export function collectInject(params: CollectInjectParams): Set<string> {
       ctx.valNodeMap.set(lookupKey, parentNode);
     }
 
-    provideRawToNode.set(val as object, parentNode);
+    provideRawToNode.set(val, parentNode);
   }
 
   if (provideRawToNode.size > 0) {
