@@ -15,6 +15,12 @@ If a question can be answered by exploring the codebase, explore the codebase in
 
 <supporting-info>
 
+## Project-specific context source
+
+This project uses `CLAUDE.md` as the primary domain documentation.
+Read it first before exploring the codebase. When updating domain terms,
+write to `CONTEXT.md` (creating if needed), not `CLAUDE.md`.
+
 ## Domain awareness
 
 During codebase exploration, also look for existing documentation:
