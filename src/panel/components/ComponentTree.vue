@@ -11,6 +11,8 @@ const emit = defineEmits<{
   select: [uid: string]
 }>()
 
+const search = ref('')
+
 interface TreeNode {
   uid: string
   name: string
@@ -42,9 +44,9 @@ const TreeItem = defineComponent({
             ? h('span', {
                 class: ['expand-icon', { expanded: expanded.value }],
                 onClick: (e: MouseEvent) => { e.stopPropagation(); expanded.value = !expanded.value },
-              }, '▸')
+              }, '▶')
             : h('span', { class: 'expand-icon-placeholder' }),
-          h('span', { class: 'node-name' }, node.name),
+          h('span', { class: 'node-name' }, '<' + node.name + '>'),
         ]),
         expanded.value && hasChildren
           ? h('div', null, node.children.map(child =>
@@ -60,6 +62,21 @@ const TreeItem = defineComponent({
       ])
     }
   },
+})
+
+const filteredNodes = computed(() => {
+  const keyword = search.value.trim().toLowerCase()
+  if (!keyword) return null  // null = 顯示完整樹
+
+  const result: { uid: string; name: string }[] = []
+  for (const [uid, nodes] of Object.entries(props.graph.components)) {
+    const sentinel = nodes[0]
+    if (!sentinel || sentinel.type !== 'component') continue
+    if ((sentinel.name ?? '').toLowerCase().includes(keyword)) {
+      result.push({ uid, name: sentinel.name ?? '' })
+    }
+  }
+  return result
 })
 
 const treeStructure = computed(() => {
@@ -93,10 +110,33 @@ const treeStructure = computed(() => {
 
 <template>
   <div class="component-tree">
-    <div v-if="treeStructure.length === 0" class="empty-state">
-      No components
+    <div class="tree-search">
+      <input
+        v-model="search"
+        class="tree-search-input"
+        type="text"
+        placeholder="Find components..."
+      />
     </div>
+
+    <!-- 搜尋結果（平鋪） -->
+    <div v-if="filteredNodes !== null" class="tree-list">
+      <div v-if="filteredNodes.length === 0" class="empty-state">No results</div>
+      <div
+        v-for="item in filteredNodes"
+        :key="item.uid"
+        class="tree-node"
+        :class="{ selected: selectedUid === item.uid }"
+        @click="emit('select', item.uid)"
+      >
+        <span class="expand-icon-placeholder" />
+        <span class="node-name">&lt;{{ item.name }}&gt;</span>
+      </div>
+    </div>
+
+    <!-- 原始樹（無搜尋時） -->
     <div v-else class="tree-list">
+      <div v-if="treeStructure.length === 0" class="empty-state">No components</div>
       <TreeItem
         v-for="node in treeStructure"
         :key="node.uid"
@@ -108,12 +148,37 @@ const treeStructure = computed(() => {
   </div>
 </template>
 
-<style scoped>
+<style>
 .component-tree {
   flex: 1;
-  overflow-y: auto;
-  padding: 8px 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
 }
+
+.tree-search {
+  padding: 8px;
+  border-bottom: 1px solid #1f2e45;
+  flex-shrink: 0;
+}
+
+.tree-search-input {
+  width: 100%;
+  background: #1c2840;
+  border: 1px solid #2a3f5c;
+  color: #cdd9ee;
+  border-radius: 5px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  outline: none;
+}
+
+.tree-search-input::placeholder { color: #334560; }
+.tree-search-input:focus { border-color: #42d392; }
 
 .empty-state {
   padding: 20px 10px;
@@ -124,6 +189,10 @@ const treeStructure = computed(() => {
 
 .tree-list {
   width: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 0;
 }
 
 .tree-item-wrapper {
@@ -148,10 +217,14 @@ const treeStructure = computed(() => {
 }
 
 .tree-node.selected {
-  background: #172030;
+  background: rgba(66, 211, 146, 0.1);
   color: #42d392;
   border-left: 2px solid #42d392;
   padding-left: 6px;
+}
+
+.tree-node.selected:hover {
+  background: rgba(66, 211, 146, 0.15);
 }
 
 .expand-icon {
@@ -159,7 +232,7 @@ const treeStructure = computed(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: 12px;
   color: #4a5f7a;
   transition: transform 0.15s;
   cursor: pointer;

@@ -8,11 +8,15 @@ import { useGraphFetcher } from './composables/useGraphFetcher'
 import { useDevtoolsConnection } from './composables/useDevtoolsConnection'
 import { TAB } from './tabs'
 import type { Tab } from './tabs'
+import { NODE_TYPES } from './nodeTypeMeta'
+
+type RightMode = 'select' | 'graph'
 
 const graph = ref<GraphData>({ components: {}, stores: {} })
 const selectedUid = ref<string>('')
 const selectedId = ref<string | null>(null)
 const activeTab = ref<Tab>(TAB.Components)
+const rightMode = ref<RightMode>('select')
 
 const currentNodes = computed(() => graph.value.components[selectedUid.value] ?? [])
 const allNodes = computed(() => [
@@ -20,23 +24,50 @@ const allNodes = computed(() => [
   ...Object.values(graph.value.stores).flat(),
 ])
 
+const selectedComponentName = computed(() => {
+  const nodes = graph.value.components[selectedUid.value]
+  const sentinel = nodes?.[0]
+  if (!sentinel || sentinel.type !== 'component') return null
+  return sentinel.name ?? null
+})
+
 function onSelectComponent(uid: string) {
   selectedUid.value = uid
-  selectedId.value = null
+  rightMode.value = 'graph'
+  const nodes = graph.value.components[uid] ?? []
+  let firstId: string | null = null
+  for (const type of NODE_TYPES) {
+    const found = nodes.find(n => n.type === type)
+    if (found) { firstId = found.id; break }
+  }
+  selectedId.value = firstId
 }
 
 function onSelectTab(tab: Tab) {
   activeTab.value = tab
+  if (tab === TAB.Stores) rightMode.value = 'graph'
+}
+
+function toggleComponentTree() {
+  rightMode.value = (rightMode.value === 'graph' || !selectedUid.value) ? 'select' : 'graph'
+}
+
+function onSelectVariable(id: string) {
+  selectedId.value = id
+  rightMode.value = 'graph'
 }
 
 const { fetchGraph } = useGraphFetcher()
 
 async function handleFetchGraph() {
+  const prevUid = selectedUid.value
   const result = await fetchGraph()
   if (!result) return
   graph.value = result
   if (!selectedUid.value || !result.components[selectedUid.value]) {
-    selectedUid.value = Object.keys(result.components)[0] ?? ''
+    const nextUid = Object.keys(result.components)[0] ?? ''
+    if (prevUid && prevUid !== nextUid) rightMode.value = 'select'
+    selectedUid.value = nextUid
   }
 }
 
@@ -65,28 +96,35 @@ onMounted(() => {
         <!-- Selector row -->
         <div class="comp-select-wrap">
           <div class="select-row">
+            <button
+              class="comp-trigger-btn"
+              :disabled="activeTab === TAB.Stores"
+              @click="toggleComponentTree()"
+            >
+              <span v-if="selectedComponentName" class="trigger-name">&lt;{{ selectedComponentName }}&gt;</span>
+              <span v-else class="trigger-placeholder">Select component...</span>
+            </button>
             <button class="refresh-btn" title="Refresh" @click="handleFetchGraph">↺</button>
           </div>
         </div>
-
-        <ComponentTree
-          v-if="activeTab === TAB.Components"
-          :graph="graph"
-          :selected-uid="selectedUid"
-          @select="onSelectComponent"
-        />
 
         <VariableList
           :nodes="activeTab === TAB.Components ? currentNodes : Object.values(graph.stores).flat()"
           :selected-id="selectedId"
           :group-by="activeTab === TAB.Stores ? 'store' : undefined"
-          @select="selectedId = $event"
+          @select="onSelectVariable($event)"
         />
       </div>
 
       <!-- RIGHT: graph -->
       <div class="right">
-        <GraphView :nodes="allNodes" :selected-id="selectedId" />
+        <ComponentTree
+          v-if="rightMode === 'select' && activeTab === TAB.Components"
+          :graph="graph"
+          :selected-uid="selectedUid"
+          @select="onSelectComponent"
+        />
+        <GraphView v-else :nodes="allNodes" :selected-id="selectedId" />
       </div>
     </div>
   </div>
@@ -238,5 +276,40 @@ body {
 
 .tab-btn:hover:not(.active) {
   color: #8aa4c8;
+}
+
+.comp-trigger-btn {
+  flex: 1;
+  background: #1c2840;
+  border: 1px solid #2a3f5c;
+  color: #cdd9ee;
+  border-radius: 5px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: border-color .15s;
+  height: 30px;
+}
+
+.comp-trigger-btn:hover:not(:disabled) {
+  border-color: #42d392;
+}
+
+.comp-trigger-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.trigger-name {
+  color: #42d392;
+}
+
+.trigger-placeholder {
+  color: #4a5f7a;
 }
 </style>
