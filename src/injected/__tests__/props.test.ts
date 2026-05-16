@@ -88,8 +88,7 @@ const DupParent = defineComponent({
 describe('Phase 3 — Props 基礎傳遞', () => {
   it('ref → prop（同名）：prop node 連回父層 ref', () => {
     const graph = runWalker(SameNameParent)
-    const parentPath = Object.values(graph.components)[0]?.[0]?.path
-    const parent = getComponentNodes(graph, parentPath || 'SameNameParent')
+    const parent = getComponentNodes(graph, 'SameNameParent')
     const childPath = Object.values(graph.components).find(n => n[0]?.path?.includes('SameNameChild'))?.[0]?.path
     const child = getComponentNodes(graph, childPath || 'SameNameParent.SameNameChild')
 
