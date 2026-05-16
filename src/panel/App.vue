@@ -17,6 +17,7 @@ const selectedUid = ref<string>('')
 const selectedId = ref<string | null>(null)
 const activeTab = ref<Tab>(TAB.Components)
 const rightMode = ref<RightMode>('select')
+const searchQuery = ref('')
 
 const currentNodes = computed(() => graph.value.components[selectedUid.value] ?? [])
 const allNodes = computed(() => [
@@ -68,6 +69,7 @@ async function handleFetchGraph() {
     const nextUid = Object.keys(result.components)[0] ?? ''
     if (prevUid && prevUid !== nextUid) rightMode.value = 'select'
     selectedUid.value = nextUid
+    selectedId.value = null
   }
 }
 
@@ -120,6 +122,7 @@ onMounted(() => {
       <div class="right">
         <ComponentTree
           v-if="rightMode === 'select' && activeTab === TAB.Components"
+          v-model:searchQuery="searchQuery"
           :graph="graph"
           :selected-uid="selectedUid"
           @select="onSelectComponent"

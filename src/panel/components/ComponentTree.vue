@@ -11,7 +11,7 @@ const emit = defineEmits<{
   select: [uid: string]
 }>()
 
-const search = ref('')
+const searchQuery = defineModel<string>('searchQuery', { default: '' })
 
 interface TreeNode {
   uid: string
@@ -65,7 +65,7 @@ const TreeItem = defineComponent({
 })
 
 const filteredNodes = computed(() => {
-  const keyword = search.value.trim().toLowerCase()
+  const keyword = searchQuery.value.trim().toLowerCase()
   if (!keyword) return null  // null = 顯示完整樹
 
   const result: { uid: string; name: string }[] = []
@@ -112,7 +112,7 @@ const treeStructure = computed(() => {
   <div class="component-tree">
     <div class="tree-search">
       <input
-        v-model="search"
+        v-model="searchQuery"
         class="tree-search-input"
         type="text"
         placeholder="Find components..."
