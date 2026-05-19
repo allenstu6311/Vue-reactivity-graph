@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, defineComponent, h, ref, type VNode } from 'vue'
+import { computed } from 'vue'
 import type { GraphData } from '../../graph'
+import TreeItem, { type TreeNode } from './TreeItem.vue'
 
 const props = defineProps<{
   graph: GraphData
@@ -13,67 +14,21 @@ const emit = defineEmits<{
 
 const searchQuery = defineModel<string>('searchQuery', { default: '' })
 
-interface TreeNode {
-  uid: string
-  name: string
-  path: string
-  children: TreeNode[]
-}
-
-const TreeItem = defineComponent({
-  props: {
-    node: { type: Object as () => TreeNode, required: true },
-    selectedUid: { type: String, default: '' },
-    level: { type: Number, default: 0 },
-  },
-  emits: ['select'],
-  setup(props, { emit }): () => VNode {
-    const expanded = ref(true)
-    return (): VNode => {
-      const { node, selectedUid, level } = props
-      const isSelected = selectedUid === node.uid
-      const hasChildren = node.children.length > 0
-
-      return h('div', { class: 'tree-item-wrapper' }, [
-        h('div', {
-          class: ['tree-node', { selected: isSelected }],
-          style: { paddingLeft: `${level * 12}px` },
-          onClick: () => emit('select', node.uid),
-        }, [
-          hasChildren
-            ? h('span', {
-                class: ['expand-icon', { expanded: expanded.value }],
-                onClick: (e: MouseEvent) => { e.stopPropagation(); expanded.value = !expanded.value },
-              }, '▶')
-            : h('span', { class: 'expand-icon-placeholder' }),
-          h('span', { class: 'node-name' }, '<' + node.name + '>'),
-        ]),
-        expanded.value && hasChildren
-          ? h('div', null, node.children.map(child =>
-              h(TreeItem, {
-                key: child.uid,
-                node: child,
-                selectedUid,
-                level: level + 1,
-                onSelect: (uid: string) => emit('select', uid),
-              }),
-            ))
-          : null,
-      ])
-    }
-  },
-})
-
 const filteredNodes = computed(() => {
   const keyword = searchQuery.value.trim().toLowerCase()
   if (!keyword) return null  // null = 顯示完整樹
 
-  const result: { uid: string; name: string }[] = []
+  const result: TreeNode[] = []
   for (const [uid, nodes] of Object.entries(props.graph.components)) {
     const sentinel = nodes[0]
     if (!sentinel || sentinel.type !== 'component') continue
     if ((sentinel.name ?? '').toLowerCase().includes(keyword)) {
-      result.push({ uid, name: sentinel.name ?? '' })
+      result.push({
+        uid,
+        name: sentinel.name ?? '',
+        path: '',
+        children: [],
+      })
     }
   }
   return result
@@ -122,16 +77,13 @@ const treeStructure = computed(() => {
     <!-- 搜尋結果（平鋪） -->
     <div v-if="filteredNodes !== null" class="tree-list">
       <div v-if="filteredNodes.length === 0" class="empty-state">No results</div>
-      <div
+      <TreeItem
         v-for="item in filteredNodes"
         :key="item.uid"
-        class="tree-node"
-        :class="{ selected: selectedUid === item.uid }"
-        @click="emit('select', item.uid)"
-      >
-        <span class="expand-icon-placeholder" />
-        <span class="node-name">&lt;{{ item.name }}&gt;</span>
-      </div>
+        :node="item"
+        :selected-uid="selectedUid"
+        @select="emit('select', $event)"
+      />
     </div>
 
     <!-- 原始樹（無搜尋時） -->
@@ -148,7 +100,7 @@ const treeStructure = computed(() => {
   </div>
 </template>
 
-<style>
+<style scoped>
 .component-tree {
   flex: 1;
   width: 100%;
@@ -194,73 +146,9 @@ const treeStructure = computed(() => {
   overflow-y: auto;
   padding: 8px 0;
 }
+</style>
 
-.tree-item-wrapper {
-  width: 100%;
-}
-
-.tree-node {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 8px;
-  cursor: pointer;
-  user-select: none;
-  transition: background 0.1s;
-  color: #8aa4c8;
-  font-size: 12px;
-  font-family: 'JetBrains Mono', monospace;
-}
-
-.tree-node:hover {
-  background: #172030;
-}
-
-.tree-node.selected {
-  background: rgba(66, 211, 146, 0.1);
-  color: #42d392;
-  border-left: 2px solid #42d392;
-  padding-left: 6px;
-}
-
-.tree-node.selected:hover {
-  background: rgba(66, 211, 146, 0.15);
-}
-
-.expand-icon {
-  width: 16px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  color: #4a5f7a;
-  transition: transform 0.15s;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.expand-icon.expanded {
-  transform: rotate(90deg);
-}
-
-.expand-icon-placeholder {
-  width: 16px;
-  flex-shrink: 0;
-}
-
-.node-name {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-::-webkit-scrollbar {
-  width: 4px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #2a3f5c;
-  border-radius: 2px;
-}
+<style>
+.tree-list::-webkit-scrollbar { width: 4px; }
+.tree-list::-webkit-scrollbar-thumb { background: #2a3f5c; border-radius: 2px; }
 </style>
