@@ -1,7 +1,7 @@
 import type { CollectWatchParams } from "./types";
 
 export function collectWatch(params: CollectWatchParams): void {
-  const { instance, uid, name, path, file, nodes, watchEffects } = params;
+  const { instance, uid, name, path, file, filePath, nodes, watchEffects } = params;
 
   if (!watchEffects || watchEffects.length === 0) return;
 
@@ -15,6 +15,7 @@ export function collectWatch(params: CollectWatchParams): void {
       type: "watch",
       val: null,
       file,
+      filePath,
       deps: [],
       subs: [],
     });

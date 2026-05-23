@@ -1,3 +1,4 @@
+import { basename } from '../helper/utils'
 import type { GraphNode } from '../../graph/types'
 import type { ExtendedComponentInstance, Data, WatchEffect } from '../../types/vue-internals'
 import type { InstanceData } from './types'
@@ -14,14 +15,14 @@ export class WalkContext {
 
   resolveComponentKey(
     parentPath: string | undefined,
-    file: string,
+    name: string,
     uid: number
   ): { key: string; name: string; path: string } {
-    const path = parentPath ? `${parentPath}.${file}` : file
+    const path = parentPath ? `${parentPath}.${name}` : name
 
     return {
       key: uid.toString(),
-      name: file,
+      name: name,
       path,
     }
   }
@@ -43,17 +44,21 @@ export class WalkContext {
 }
 
 export function extractInstanceData(instance: ExtendedComponentInstance): InstanceData {
-  const file =
+  const filePath = (instance.type as any).__file ?? ''
+  const name =
     ((instance.type as any).__name as string) ||
     ((instance.type as any).name as string) ||
     'Anonymous'
+  const file = basename(filePath) || 'Anonymous'
 
   const rawSetupState = instance.setupState?.['__v_raw'] || {}
 
   const watchEffects = instance.scope?.effects.filter((e) => e !== instance.effect) ?? []
 
   return {
+    name,
     file,
+    filePath,
     rawSetupState,
     watchEffects,
   }

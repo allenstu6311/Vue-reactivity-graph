@@ -10,6 +10,7 @@ export interface GraphNode {
   type: NodeType
   val: unknown
   file: string
+  filePath: string
   deps: string[]  // 依賴節點的完整 id（uid-based 格式，例如 "12.price"），computed / watch 有
   subs: string[]  // 訂閱者節點的完整 id（uid-based 格式），ref / reactive / computed 有
 }

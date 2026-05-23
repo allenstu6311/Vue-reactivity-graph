@@ -8,6 +8,7 @@ export interface CollectPropsParams {
   name: string
   path: string
   file: string
+  filePath: string
   nodes: GraphNode[]
   ctx: WalkContext
   // propsOptions 由 orchestrator 傳入（sentinel dry-run 也需要同一份，在外層統一取）
@@ -24,6 +25,7 @@ export interface CollectInjectParams {
   path: string
   parent?: { uid: number; path: string }
   file: string
+  filePath: string
   nodes: GraphNode[]
   ctx: WalkContext
   rawSetupState: Record<string, unknown>
@@ -35,6 +37,7 @@ export interface CollectSetupParams {
   name: string
   path: string
   file: string
+  filePath: string
   nodes: GraphNode[]
   valNodeMap: WeakMap<object, GraphNode>   // 直接傳入，不包進 ctx
   skipKeys?: Set<string>                   // optional，與現行 CollectSetupStateParams 一致
@@ -47,6 +50,7 @@ export interface CollectWatchParams {
   name: string
   path: string
   file: string
+  filePath: string
   nodes: GraphNode[]
   watchEffects: WatchEffect[]
 }

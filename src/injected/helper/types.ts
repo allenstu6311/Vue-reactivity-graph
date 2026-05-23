@@ -39,6 +39,7 @@ export interface BaseCollectParams {
   name: string;
   path: string;
   file: string;
+  filePath: string;
   nodes: GraphNode[];
   valNodeMap: WeakMap<object, GraphNode>;
 }

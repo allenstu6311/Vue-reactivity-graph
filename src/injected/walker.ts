@@ -25,10 +25,10 @@ export function collectInstance({
   ctx: WalkContext
 }): void {
   const instance = ctx.resolveInstance(rawInstance);
-  const { file, rawSetupState, watchEffects } = extractInstanceData(instance);
+  const { name, file, filePath, rawSetupState, watchEffects } = extractInstanceData(instance);
   const propsOptions = instance.propsOptions?.[0];
   const parentRawSetupState = instance.parent?.setupState?.["__v_raw"];
-  const { key, name, path } = ctx.resolveComponentKey(parent?.path, file, instance.uid);
+  const { key, name: componentName, path } = ctx.resolveComponentKey(parent?.path, name, instance.uid);
   const nodes: GraphNode[] = [];
 
   // 插入 metadata sentinel node
@@ -36,11 +36,12 @@ export function collectInstance({
     id: key,
     uid: instance.uid,
     parentUid: parent?.uid,
-    name,
+    name: componentName,
     path,
     type: 'component',
     val: null,
     file,
+    filePath,
     deps: [],
     subs: [],
   });
@@ -49,17 +50,17 @@ export function collectInstance({
   runSentinelDryRun({ instance, rawSetupState, propsOptions, ctx });
 
   // 2. collect props（Strategy 1 / 2 來源連結）
-  collectProps({ instance, uid: instance.uid, name, path, file, nodes, ctx, propsOptions, parentRawSetupState });
+  collectProps({ instance, uid: instance.uid, name: componentName, path, file, filePath, nodes, ctx, propsOptions, parentRawSetupState });
 
   // 3. collect inject（回傳 injectKeySet 供 setup 跳過同名 key）
-  const injectKeys = collectInject({ instance, uid: instance.uid, name, path, parent, file, nodes, ctx, rawSetupState });
+  const injectKeys = collectInject({ instance, uid: instance.uid, name, path, parent, file, filePath, nodes, ctx, rawSetupState });
 
   // 5. collect setup state（跳過 inject keys）
   const storeValToComponentNode = new Map<object, GraphNode>();
-  collectSetup({ rawSetupState, uid: instance.uid, name, path, file, nodes, valNodeMap: ctx.valNodeMap, skipKeys: injectKeys, storeValToComponentNode });
+  collectSetup({ rawSetupState, uid: instance.uid, name, path, file, filePath, nodes, valNodeMap: ctx.valNodeMap, skipKeys: injectKeys, storeValToComponentNode });
 
   // 6. collect watch
-  collectWatch({ instance, uid: instance.uid, name, path, file, nodes, watchEffects });
+  collectWatch({ instance, uid: instance.uid, name, path, file, filePath, nodes, watchEffects });
 
   updateComponent(key, nodes);
   // DFS：遞迴處理子元件樹，確保 DFS 順序維持不變
