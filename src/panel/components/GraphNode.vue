@@ -35,7 +35,7 @@ function truncate(str: string, max: number) {
     <div class="n-name" :style="{ color: data.focused ? '#e8f4ff' : '#cdd9ee' }">
       {{ truncate(getDisplayName(data), 18) }}
     </div>
-    <div class="n-file">{{ truncate(data.file, 22) }}</div>
+    <div class="n-file">{{ truncate(data.name, 22) }}</div>
     <div v-if="data.val && data.val !== '—'" class="n-val">
       {{ truncate(String(data.val), 14) }}
     </div>

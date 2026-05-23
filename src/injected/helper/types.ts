@@ -4,7 +4,6 @@ import type { Data } from "../../types/vue-internals";
 export interface CollectSetupStateParams {
   rawSetupState: Data;
   componentName: string;
-  file: string;
   nodes: GraphNode[];
   valNodeMap: WeakMap<object, GraphNode>;
   skipKeys?: Set<string>;
@@ -38,7 +37,6 @@ export interface BaseCollectParams {
   uid: number;
   name: string;
   path: string;
-  file: string;
   filePath: string;
   nodes: GraphNode[];
   valNodeMap: WeakMap<object, GraphNode>;

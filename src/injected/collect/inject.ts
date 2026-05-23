@@ -2,7 +2,6 @@ import type { CollectInjectParams } from "./types";
 import type { GraphNode } from "../../graph";
 import { getGraphData } from "../../graph";
 import { linkNodes } from "../subscribers/shared";
-import { basename } from "../helper/utils";
 
 // DFS 時序契約：anonymous provide node 建立後直接寫入 getGraphData().components[parent!.uid.toString()]。
 // 此陣列由父層 updateComponent(parent!.uid.toString(), nodes) 建立——DFS 保證父層 collectInstance
@@ -19,7 +18,7 @@ import { basename } from "../helper/utils";
 //   2. ctx.valNodeMap.set(lookupKey, parentNode)
 //   3. ctx.propSourceInjectMap.set(injectRaw, injectNode)
 export function collectInject(params: CollectInjectParams): Set<string> {
-  const { instance, uid, name, path, parent, file, filePath, nodes, ctx, rawSetupState } = params;
+  const { instance, uid, name, path, parent, filePath, nodes, ctx, rawSetupState } = params;
 
   const injectKeySet = new Set<string>();
   const parentProvides = instance.parent?.provides;
@@ -37,7 +36,6 @@ export function collectInject(params: CollectInjectParams): Set<string> {
     (instance.parent?.type as any)?.__name ||
     (instance.parent?.type as any)?.name ||
     'Anonymous';
-  const parentFile = basename(parentFilePath) || 'Anonymous';
 
   for (const key of provideKeys) {
     const val = parentProvides[key];
@@ -61,7 +59,6 @@ export function collectInject(params: CollectInjectParams): Set<string> {
         varName: "anonymous",
         type: (val as any).__v_isRef ? "ref" : "reactive",
         val: lookupKey,
-        file: parentFile,
         filePath: parentFilePath,
         deps: [],
         subs: [],
@@ -89,7 +86,6 @@ export function collectInject(params: CollectInjectParams): Set<string> {
         varName: childKey,
         type: "inject",
         val: (val as any).__v_raw ?? val,
-        file,
         filePath,
         deps: [],
         subs: [],

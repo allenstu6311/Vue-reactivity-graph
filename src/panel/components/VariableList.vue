@@ -25,13 +25,13 @@ const grouped = computed(() => {
   const q = search.value.toLowerCase()
 
   if (props.groupBy === 'store') {
-    const seenIds = [...new Set(props.nodes.map(n => n.file))]
+    const seenIds = [...new Set(props.nodes.map(n => n.name))]
     return seenIds.map(storeId => ({
       type: 'store' as NodeType,
       config: NODE_TYPE_META['store'],
       label: storeId,
       items: props.nodes.filter(
-        n => n.file === storeId && getDisplayName(n).toLowerCase().includes(q)
+        n => n.name === storeId && getDisplayName(n).toLowerCase().includes(q)
       ),
     })).filter(g => g.items.length > 0)
   }

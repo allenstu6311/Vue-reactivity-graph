@@ -1,4 +1,3 @@
-import { basename } from '../helper/utils'
 import type { GraphNode } from '../../graph/types'
 import type { ExtendedComponentInstance, Data, WatchEffect } from '../../types/vue-internals'
 import type { InstanceData } from './types'
@@ -49,7 +48,6 @@ export function extractInstanceData(instance: ExtendedComponentInstance): Instan
     ((instance.type as any).__name as string) ||
     ((instance.type as any).name as string) ||
     'Anonymous'
-  const file = basename(filePath) || 'Anonymous'
 
   const rawSetupState = instance.setupState?.['__v_raw'] || {}
 
@@ -57,7 +55,6 @@ export function extractInstanceData(instance: ExtendedComponentInstance): Instan
 
   return {
     name,
-    file,
     filePath,
     rawSetupState,
     watchEffects,

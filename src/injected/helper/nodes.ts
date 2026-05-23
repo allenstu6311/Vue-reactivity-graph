@@ -10,13 +10,12 @@ export function makeNode(
   varName: string,
   type: NodeType,
   val: unknown,
-  file: string,
   filePath: string,
+  name: string,
   uid?: number,
-  name?: string,
   path?: string,
 ): GraphNode {
-  return { id, varName, type, val, file, filePath, deps: [], subs: [], uid, name, path };
+  return { id, varName, type, val, filePath, name, deps: [], subs: [], uid, path };
 }
 
 export function setValNode(
@@ -35,21 +34,20 @@ export function buildNode(
   uid: number,
   name: string,
   path: string,
-  file: string,
   filePath: string,
 ): GraphNode | null {
   const id = `${uid}.${key}`;
 
   if (val?.effect) {
-    return makeNode(id, key, "computed", val, file, filePath, uid, name, path);
+    return makeNode(id, key, "computed", val, filePath, name, uid, path);
   }
 
   if (val?.__v_isRef) {
-    return makeNode(id, key, "ref", val, file, filePath, uid, name, path);
+    return makeNode(id, key, "ref", val, filePath, name, uid, path);
   }
 
   if (val?.setup) {
-    return makeNode(id, key, "component", val, file, filePath, uid, name, path);
+    return makeNode(id, key, "component", val, filePath, name, uid, path);
   }
 
   if (val.__v_isReactive) {
@@ -59,7 +57,7 @@ export function buildNode(
       ),
     );
 
-    return makeNode(id, key, "reactive", snapshot, file, filePath, uid, name, path);
+    return makeNode(id, key, "reactive", snapshot, filePath, name, uid, path);
   }
   return null;
 }

@@ -7,7 +7,6 @@ export interface CollectPropsParams {
   uid: number
   name: string
   path: string
-  file: string
   filePath: string
   nodes: GraphNode[]
   ctx: WalkContext
@@ -24,7 +23,6 @@ export interface CollectInjectParams {
   name: string
   path: string
   parent?: { uid: number; path: string }
-  file: string
   filePath: string
   nodes: GraphNode[]
   ctx: WalkContext
@@ -36,7 +34,6 @@ export interface CollectSetupParams {
   uid: number
   name: string
   path: string
-  file: string
   filePath: string
   nodes: GraphNode[]
   valNodeMap: WeakMap<object, GraphNode>   // 直接傳入，不包進 ctx
@@ -49,7 +46,6 @@ export interface CollectWatchParams {
   uid: number
   name: string
   path: string
-  file: string
   filePath: string
   nodes: GraphNode[]
   watchEffects: WatchEffect[]

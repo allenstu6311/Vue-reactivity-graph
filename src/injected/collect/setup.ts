@@ -14,7 +14,6 @@ export function collectSetup({
   uid,
   name,
   path,
-  file,
   filePath,
   nodes,
   valNodeMap,
@@ -42,7 +41,7 @@ export function collectSetup({
           ? valNodeMap.get(storeVal as object)
           : undefined;
 
-      const componentNode = buildNode(key, trackedVal, uid, name, path, file, filePath);
+      const componentNode = buildNode(key, trackedVal, uid, name, path, filePath);
       if (componentNode && storeNode) {
         linkNodes(storeNode, componentNode);
         storeValToComponentNode.set(storeVal as object, componentNode);
@@ -52,7 +51,7 @@ export function collectSetup({
       continue;
     }
 
-    const node = buildNode(key, trackedVal, uid, name, path, file, filePath);
+    const node = buildNode(key, trackedVal, uid, name, path, filePath);
     if (node) {
       setValNode(valNodeMap, trackedVal, node);
       nodes.push(node);
@@ -79,7 +78,7 @@ export function collectPiniaState(
         varName: key,
         type: "store",
         val,
-        file: storeId,
+        name: storeId,
         filePath: '',
         deps: [],
         subs: [],
