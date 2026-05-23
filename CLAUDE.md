@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 ## 專案簡介
 
 **插件名稱**：Vue Reactivity Graph
@@ -21,6 +25,26 @@
 - 避免 monkey-patching Vue 響應式物件（除非有充分理由）
 - 型別設計要讓貢獻者能快速理解意圖
 - 侵入性操作（如直接掛屬性在 Vue 物件上）需有明確說明或替換成更乾淨的方案
+
+---
+
+## 指令
+
+```bash
+pnpm dev          # 監聽模式建置（watch），開發時使用
+pnpm build        # 一次性建置輸出到 dist/
+pnpm typecheck    # vue-tsc 型別檢查（不輸出）
+pnpm test         # 執行所有單元測試（vitest run）
+```
+
+測試檔位置：`src/injected/__tests__/*.test.ts`
+
+執行單一測試檔：
+```bash
+pnpm vitest run src/injected/__tests__/props.test.ts
+```
+
+載入插件：瀏覽器開啟 `chrome://extensions/`，以「載入未封裝擴充功能」指向 `dist/` 資料夾。
 
 ---
 
@@ -97,9 +121,11 @@
 
 ---
 
-## 啟動指令
+## 對話開始必讀
 
-請在每次對話開始時讀取 `ARCHITECTURE.md`與 `DESIGN_NOTES.md`。
+每次對話開始前必須讀取：
+- `ARCHITECTURE.md`：三層環境分層、資料流時序、Phase 1 / Phase 2 解析流程圖
+- `DESIGN_NOTES.md`：onTrack 限制、追蹤策略索引（setup-state / props / inject / pinia）、DFS 順序重要性
 
 ---
 
