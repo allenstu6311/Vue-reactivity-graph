@@ -1,6 +1,7 @@
 import type { CollectInjectParams } from "./types";
 import type { GraphNode } from "../../graph";
 import { getGraphData } from "../../graph";
+import { createNode } from "../helper/nodes";
 import { linkNodes } from "../subscribers/shared";
 
 // DFS 時序契約：anonymous provide node 建立後直接寫入 getGraphData().components[parent!.uid.toString()]。
@@ -51,7 +52,7 @@ export function collectInject(params: CollectInjectParams): Set<string> {
         typeof key === "symbol"
           ? `anonymous:${key.description ?? "symbol"}`
           : `anonymous:${String(key)}`;
-      parentNode = {
+      parentNode = createNode({
         id: `${parent!.uid}.${keyStr}`,
         uid: parent!.uid,
         name: parentComponentName,
@@ -60,9 +61,7 @@ export function collectInject(params: CollectInjectParams): Set<string> {
         type: (val as any).__v_isRef ? "ref" : "reactive",
         val: lookupKey,
         filePath: parentFilePath,
-        deps: [],
-        subs: [],
-      };
+      });
       getGraphData().components[parent!.uid.toString()]?.push(parentNode);
       ctx.valNodeMap.set(lookupKey, parentNode);
     }
@@ -78,7 +77,7 @@ export function collectInject(params: CollectInjectParams): Set<string> {
 
       if (!parentNode) continue;
       injectKeySet.add(childKey);
-      const injectNode: GraphNode = {
+      const injectNode = createNode({
         id: `${uid}.${childKey}`,
         uid,
         name,
@@ -87,9 +86,7 @@ export function collectInject(params: CollectInjectParams): Set<string> {
         type: "inject",
         val: (val as any).__v_raw ?? val,
         filePath,
-        deps: [],
-        subs: [],
-      };
+      });
       linkNodes(parentNode, injectNode);
       nodes.push(injectNode);
       const injectRaw = (val as any).__v_raw ?? val;

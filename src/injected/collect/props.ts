@@ -1,5 +1,6 @@
 import type { CollectPropsParams } from "./types";
 import type { GraphNode } from "../../graph";
+import { createNode } from "../helper/nodes";
 import { linkNodes } from "../subscribers/shared";
 
 // Strategy 1：同名查找（父層 setupState 同名值 → valNodeMap.get）
@@ -27,7 +28,7 @@ export function collectProps(params: CollectPropsParams): void {
   if (siblingPropMaps) siblingPropMaps.nextIndex++;
 
   for (const propKey in propsOptions) {
-    const propNode: GraphNode = {
+    const propNode = createNode({
       id: `${uid}.${propKey}`,
       uid,
       name,
@@ -36,9 +37,7 @@ export function collectProps(params: CollectPropsParams): void {
       type: "prop",
       val: (instance.props as Record<string, unknown>)[propKey],
       filePath,
-      deps: [],
-      subs: [],
-    };
+    });
 
     nodes.push(propNode);
     propMap.set(propKey, propNode);

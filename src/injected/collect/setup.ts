@@ -3,7 +3,7 @@ import type {
   ReactiveTarget,
   PiniaInstance,
 } from "../../types/vue-internals";
-import { buildNode, setValNode } from "../helper/nodes";
+import { detectNodeType, createNode, setValNode } from "../helper/nodes";
 import { isStoreToRefsRef, isPiniaStoreProxy } from "../helper/resolve";
 import { linkNodes } from "../subscribers/shared";
 import type { CollectSetupParams } from "./types";
@@ -41,7 +41,9 @@ export function collectSetup({
           ? valNodeMap.get(storeVal as object)
           : undefined;
 
-      const componentNode = buildNode(key, trackedVal, uid, name, path, filePath);
+      const type = detectNodeType(trackedVal);
+      if (!type) continue;
+      const componentNode = createNode({ id: `${uid}.${key}`, varName: key, type, val: trackedVal, filePath, name, uid, path });
       if (componentNode && storeNode) {
         linkNodes(storeNode, componentNode);
         storeValToComponentNode.set(storeVal as object, componentNode);
@@ -51,11 +53,11 @@ export function collectSetup({
       continue;
     }
 
-    const node = buildNode(key, trackedVal, uid, name, path, filePath);
-    if (node) {
-      setValNode(valNodeMap, trackedVal, node);
-      nodes.push(node);
-    }
+    const type = detectNodeType(trackedVal);
+    if (!type) continue;
+    const node = createNode({ id: `${uid}.${key}`, varName: key, type, val: trackedVal, filePath, name, uid, path });
+    setValNode(valNodeMap, trackedVal, node);
+    nodes.push(node);
   }
 }
 
@@ -73,16 +75,14 @@ export function collectPiniaState(
       if (key.startsWith("$") || key.startsWith("_")) continue;
       const val = raw[key];
       if (typeof val !== "object" || val === null) continue;
-      const node: GraphNode = {
+      const node = createNode({
         id: `${storeId}.${key}`,
         varName: key,
         type: "store",
         val,
         name: storeId,
         filePath: '',
-        deps: [],
-        subs: [],
-      };
+      });
       setValNode(valNodeMap, val, node);
       storeNodes.push(node);
     }

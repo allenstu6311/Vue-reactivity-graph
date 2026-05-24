@@ -1,4 +1,5 @@
 import type { CollectWatchParams } from "./types";
+import { createNode } from "../helper/nodes";
 
 export function collectWatch(params: CollectWatchParams): void {
   const { instance, uid, name, path, filePath, nodes, watchEffects } = params;
@@ -6,7 +7,7 @@ export function collectWatch(params: CollectWatchParams): void {
   if (!watchEffects || watchEffects.length === 0) return;
 
   watchEffects.forEach((_effect, index: number) => {
-    nodes.push({
+    nodes.push(createNode({
       id: `${uid}.w_${index}`,
       uid,
       name,
@@ -15,8 +16,6 @@ export function collectWatch(params: CollectWatchParams): void {
       type: "watch",
       val: null,
       filePath,
-      deps: [],
-      subs: [],
-    });
+    }));
   });
 }
