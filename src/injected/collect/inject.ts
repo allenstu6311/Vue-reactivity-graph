@@ -60,6 +60,8 @@ export function collectInject(params: CollectInjectParams): Set<string> {
         val: rawOrVal,
         filePath: parentFilePath,
       });
+      // parent 的 updateNodes 在 DFS 父層已執行完畢，此時才發現 provides 裡有值無對應節點——
+      // 只能 append，不能用 updateNodes（會覆蓋父層已有的節點）
       getGraphData().nodes[parent!.uid.toString()]?.push(parentNode);
       ctx.valNodeMap.set(rawOrVal, parentNode);
     }

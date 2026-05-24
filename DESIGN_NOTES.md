@@ -29,6 +29,16 @@
 
 ---
 
+## Inject Anonymous Node 的補票機制
+
+父層 `collectSetupState` 只掃 `setupState`，`provides` 裡來自外部的值不會自動建節點。
+子層 `collectInject` 是第一個能發現「這個被 inject 進來的值，來源沒有對應 GraphNode」的地方，
+此時父層的 `updateNodes` 已執行完畢，只能透過 `appendNode`（或直接 push）事後補進父層陣列。
+
+根治需要兩趟 Phase 1 或延遲 flush，目前接受這個 tradeoff。
+
+---
+
 ## 深度優先順序的重要性
 
 Phase 1（`collectInstance`）採深度優先遍歷：父層先執行，子層後執行。
