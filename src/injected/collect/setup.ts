@@ -7,6 +7,7 @@ import { detectNodeType, createNode, setValNode } from "../helper/nodes";
 import { isStoreToRefsRef, isPiniaStoreProxy } from "../helper/resolve";
 import { linkNodes } from "../subscribers/shared";
 import type { CollectSetupParams } from "./types";
+import { isObject } from "../../shared/guards";
 
 // Phase 1: 建 node、存 valNodeMap
 export function collectSetup({
@@ -25,7 +26,7 @@ export function collectSetup({
     if (skipKeys?.has(key)) continue; // inject keys — already built by collectInject
     const val = rawSetupState[key];
 
-    if (typeof val !== "object" || val === null) continue;
+    if (!isObject(val)) continue;
     if (isPiniaStoreProxy(val)) continue;
     if (valNodeMap.has(val)) continue;
     const trackedVal = val as ReactiveTarget
@@ -37,7 +38,7 @@ export function collectSetup({
       const storeKey = (trackedVal as any)._key;
       const storeVal = storeRaw?.[storeKey];
       const storeNode =
-        storeVal && typeof storeVal === "object"
+        isObject(storeVal)
           ? valNodeMap.get(storeVal as object)
           : undefined;
 
@@ -74,7 +75,7 @@ export function collectPiniaState(
     for (const key in raw) {
       if (key.startsWith("$") || key.startsWith("_")) continue;
       const val = raw[key];
-      if (typeof val !== "object" || val === null) continue;
+      if (!isObject(val)) continue;
       const node = createNode({
         id: `${storeId}.${key}`,
         varName: key,

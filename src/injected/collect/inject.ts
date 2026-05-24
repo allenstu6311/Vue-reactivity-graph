@@ -3,6 +3,7 @@ import type { GraphNode } from "../../graph";
 import { getGraphData } from "../../graph";
 import { createNode } from "../helper/nodes";
 import { linkNodes } from "../subscribers/shared";
+import { isObject, isSymbol } from "../../shared/guards";
 
 // DFS 時序契約：anonymous provide node 建立後直接寫入 getGraphData().nodes[parent!.uid.toString()]。
 // 此陣列由父層 updateNodes(parent!.uid.toString(), nodes) 建立——DFS 保證父層 collectInstance
@@ -40,14 +41,14 @@ export function collectInject(params: CollectInjectParams): Set<string> {
 
   for (const key of provideKeys) {
     const val = parentProvides[key];
-    if (typeof val !== "object" || val === null) continue;
+    if (!isObject(val)) continue;
     const raw = (val as any).__v_raw;
-    const rawOrVal = (raw && typeof raw === "object") ? raw : val;
+    const rawOrVal = isObject(raw) ? raw : val;
     let parentNode = ctx.valNodeMap.get(rawOrVal);
 
     if (!parentNode) {
       const keyStr =
-        typeof key === "symbol"
+        isSymbol(key)
           ? `anonymous:${key.description ?? "symbol"}`
           : `anonymous:${String(key)}`;
       parentNode = createNode({
@@ -72,7 +73,7 @@ export function collectInject(params: CollectInjectParams): Set<string> {
   if (provideRawToNode.size > 0) {
     for (const childKey in rawSetupState) {
       const val = rawSetupState[childKey];
-      if (typeof val !== "object" || val === null) continue;
+      if (!isObject(val)) continue;
       const parentNode = provideRawToNode.get(val as object);
 
       if (!parentNode) continue;

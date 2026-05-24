@@ -1,5 +1,6 @@
 import type { RawAppContext, SentinelVNode } from "../../types/vue-internals";
 import type { SentinelDryRunParams } from "./types";
+import { isObject, isString, isSymbol, isFunction } from "../../shared/guards";
 
 function resolveGlobalComponent(
   appContext: RawAppContext | null | undefined,
@@ -19,7 +20,7 @@ function traverseVNodeForSentinels(
   result: Map<object, { maps: Map<string, string>[]; nextIndex: number }>,
   appContext: RawAppContext | null | undefined,
 ): void {
-  if (!vnode || typeof vnode !== "object") return;
+  if (!isObject(vnode)) return;
 
   if (vnode.type && vnode.props) {
     // vnode.type 本身可能也是 sentinel（component 定義在 setupState 裡）
@@ -31,11 +32,11 @@ function traverseVNodeForSentinels(
     }
     // 全域元件（如 el-table）的 type 是字串，需從 appContext 解析成 component object
     // 才能與子元件的 instance.type 對應
-    if (typeof resolvedType === "string") {
+    if (isString(resolvedType)) {
       resolvedType =
         resolveGlobalComponent(appContext, resolvedType) ?? resolvedType;
     }
-    if (resolvedType && typeof resolvedType === "object") {
+    if (isObject(resolvedType)) {
       const propMap = new Map<string, string>();
 
       if (typeof vnode.props === "symbol" && sentinelToKey.has(vnode.props)) {
@@ -49,7 +50,7 @@ function traverseVNodeForSentinels(
 
         const sourceVal = (rawSetupState as any)[sourceKey];
         const rawSourceObj = (sourceVal?.__v_raw ?? sourceVal) as Record<string, unknown> | null;
-        if (rawSourceObj && typeof rawSourceObj === "object") {
+        if (isObject(rawSourceObj)) {
           for (const innerKey of Object.keys(rawSourceObj)) {
             const innerVal = rawSourceObj[innerKey];
             const sourceVarName = reverseMap.get(innerVal);
@@ -67,7 +68,7 @@ function traverseVNodeForSentinels(
         for (const [propName, val] of Object.entries(
           vnode.props as Record<string, unknown>,
         )) {
-          if (typeof val === "symbol" && sentinelToKey.has(val)) {
+          if (isSymbol(val) && sentinelToKey.has(val)) {
             propMap.set(propName, sentinelToKey.get(val)!);
           }
         }
@@ -96,10 +97,10 @@ function traverseVNodeForSentinels(
         appContext,
       );
     }
-  } else if (children && typeof children === "object") {
+  } else if (isObject(children)) {
     // Slots
     for (const slotFn of Object.values(children)) {
-      if (typeof slotFn === "function") {
+      if (isFunction(slotFn)) {
         try {
           const slotVNodes = (slotFn as () => unknown)();
           if (Array.isArray(slotVNodes)) {
@@ -147,7 +148,7 @@ export function runSentinelDryRun(params: SentinelDryRunParams): void {
     ? new Proxy(instance.props as object, {
         get(target, key, receiver) {
           if (
-            typeof key === "string" &&
+            isString(key) &&
             !key.startsWith("__v_") &&
             key in propsOptions
           ) {
@@ -162,7 +163,7 @@ export function runSentinelDryRun(params: SentinelDryRunParams): void {
 
   const sentinelProxy = new Proxy((instance.setupState ?? {}) as Record<string, any>, {
     get(target, key, receiver) {
-      if (typeof key === "string" && !key.startsWith("__v_")) {
+      if (isString(key) && !key.startsWith("__v_")) {
         if (key === "props" && instance.props) return sentinelPropsProxy;
         const s = Symbol(key);
         sentinelToKey.set(s, key);

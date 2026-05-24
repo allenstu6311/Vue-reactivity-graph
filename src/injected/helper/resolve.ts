@@ -1,11 +1,12 @@
 import type { GraphNode } from "../../graph";
 import { ReactiveTarget } from "../../types/vue-internals";
 import type { ResolveDepNodeParams } from "./types";
+import { isString, isFunction, isObject } from "../../shared/guards";
 
 export function isPiniaStoreProxy(val: unknown): boolean {
   return (
-    typeof (val as any)?.$id === "string" &&
-    typeof (val as any)?.$patch === "function"
+    isString((val as any)?.$id) &&
+    isFunction((val as any)?.$patch)
   );
 }
 
@@ -52,7 +53,7 @@ export function resolveDepNode({
     // target 就是響應式物件本身（ref / reactive / computedImpl / pinia store 內部值）
     valNodeMap.get(target) ||
     // Pinia store fallback：target 是 rawStore，改用 rawSetupState[depName] 查 valNodeMap
-    (setupStateVal && typeof setupStateVal === "object"
+    (isObject(setupStateVal)
       ? valNodeMap.get(setupStateVal as object)
       : undefined) ||
     // target 是 raw props object；prop 值可能是 primitive 無法當 WeakMap key，所以另開兩層結構

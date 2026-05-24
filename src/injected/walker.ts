@@ -13,6 +13,7 @@ import { collectProps } from "./collect/props";
 import { collectInject } from "./collect/inject";
 import { collectSetup, collectPiniaState } from "./collect/setup";
 import { collectWatch } from "./collect/watch";
+import { isObject } from "../shared/guards";
 
 // Phase 1: 蒐集所有節點，不觸發任何訂閱者
 export function collectInstance({
@@ -69,7 +70,7 @@ function traverseVNode(
   if (vnode.component) fn({ rawInstance: vnode.component as ExtendedComponentInstance, parent, ctx })
   if (Array.isArray(vnode.children)) {
     vnode.children.forEach((child) => {
-      if (child && typeof child === "object") traverseVNode(child as VNode, parent, ctx, fn)
+      if (isObject(child)) traverseVNode(child as VNode, parent, ctx, fn)
     })
   }
 }
@@ -99,7 +100,7 @@ export function triggerInstance({
   for (const node of nodes) {
     if (node.type !== "inject") continue;
     const raw = (node.val as any)?.__v_raw ?? node.val;
-    if (raw && typeof raw === "object") {
+    if (isObject(raw)) {
       injectRawToLocalNode.set(raw, node);
     }
   }
@@ -110,12 +111,12 @@ export function triggerInstance({
   const storeValToComponentNode = new Map<object, GraphNode>();
   for (const key in rawSetupState) {
     const val = rawSetupState[key];
-    if (!val || typeof val !== "object") continue;
+    if (!isObject(val)) continue;
     if (!isStoreToRefsRef(val)) continue;
     const storeRaw = (val as any)._object?.__v_raw ?? (val as any)._object;
     const storeVal = storeRaw?.[(val as any)._key];
     const componentNode = ctx.valNodeMap.get(val);
-    if (storeVal && typeof storeVal === "object" && componentNode) {
+    if (isObject(storeVal) && componentNode) {
       storeValToComponentNode.set(storeVal, componentNode);
     }
   }

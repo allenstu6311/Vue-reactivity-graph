@@ -1,5 +1,6 @@
 import type { GraphNode, NodeType } from "../../graph";
 import type { ReactiveTarget } from "../../types/vue-internals";
+import { isObject } from "../../shared/guards";
 
 export function getRaw<T>(val: T): T {
   return (val as any)?.__v_raw ?? val;
@@ -31,7 +32,7 @@ export function setValNode(
 ): void {
   map.set(val, node);
   const raw = getRaw(val);
-  if (raw !== val && typeof raw === "object") map.set(raw as object, node);
+  if (raw !== val && isObject(raw)) map.set(raw as object, node);
 }
 
 export function detectNodeType(val: ReactiveTarget): NodeType | null {
