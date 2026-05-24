@@ -47,8 +47,8 @@ describe('Phase 2 — Pinia Store 追蹤', () => {
 
     expect(compNodes).toBeDefined()
     expect(storeNodes).toBeDefined()
-    // 8 component nodes（sentinel + storeToRefs wrappers + computed + watch）
-    expect(compNodes).toHaveLength(8)
+    // 7 component nodes（storeToRefs wrappers + computed + watch）
+    expect(compNodes).toHaveLength(7)
     // 3 store nodes（test.count / test.items / test.double）
     expect(storeNodes).toHaveLength(3)
 

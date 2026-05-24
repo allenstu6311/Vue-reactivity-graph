@@ -27,10 +27,13 @@ const { createApp: createNullApp } = createRenderer({
 function clearGraph(): void {
   const g = getGraphData()
   for (const key of Object.keys(g.components)) {
-    delete (g.components as Record<string, unknown>)[key]
+    delete (g.components as any)[key]
+  }
+  for (const key of Object.keys(g.nodes)) {
+    delete (g.nodes as any)[key]
   }
   for (const key of Object.keys(g.stores)) {
-    delete (g.stores as Record<string, unknown>)[key]
+    delete (g.stores as any)[key]
   }
 }
 
@@ -39,10 +42,8 @@ function clearGraph(): void {
  * 例：getComponentNodes(graph, 'App.HomeView') 返回 path 為 'App.HomeView' 的節點陣列
  */
 export function getComponentNodes(graph: GraphData, path: string): GraphNode[] {
-  for (const nodes of Object.values(graph.components)) {
-    if (nodes[0]?.path === path) {
-      return nodes
-    }
+  for (const [uid, meta] of Object.entries(graph.components)) {
+    if (meta.path === path) return graph.nodes[uid] ?? []
   }
   return []
 }
@@ -52,23 +53,12 @@ export function getComponentNodes(graph: GraphData, path: string): GraphNode[] {
  * 例：makeId(graph, 'App.HomeView', 'count') 返回 "12.count"
  */
 export function makeId(graph: GraphData, path: string, varName: string): string {
-  const nodes = getComponentNodes(graph, path)
-  const sentinelNode = nodes[0]
-  if (sentinelNode && typeof sentinelNode.uid === 'number') {
-    return `${sentinelNode.uid}.${varName}`
+  for (const [, meta] of Object.entries(graph.components)) {
+    if (meta.path === path) return `${meta.uid}.${varName}`
   }
-
-  // Fallback：試著在所有 components 中找同名的
-  const allNodes = Object.values(graph.components).flat()
-  const foundNode = allNodes.find(n => n.path === path && typeof n.uid === 'number')
-  if (foundNode) {
-    return `${foundNode.uid}.${varName}`
-  }
-
-  console.error('makeId failed for path:', path, 'Available:', {
-    allNodesSentinels: Object.values(graph.components).map(n => ({ path: n[0]?.path, uid: n[0]?.uid, type: n[0]?.type }))
-  })
-  throw new Error(`Cannot find component with path "${path}" or uid is missing.`)
+  console.error('makeId failed for path:', path, 'Available:',
+    Object.values(graph.components).map(m => ({ path: m.path, uid: m.uid })))
+  throw new Error(`Cannot find component with path "${path}"`)
 }
 
 /**
@@ -92,11 +82,8 @@ export function runWalker(rootComponent: any, plugins: any[] = []): GraphData {
   // 回傳淺拷貝，避免後續測試汙染
   const g = getGraphData()
   return {
-    components: Object.fromEntries(
-      Object.entries(g.components).map(([k, v]) => [k, [...v]])
-    ),
-    stores: Object.fromEntries(
-      Object.entries(g.stores).map(([k, v]) => [k, [...v]])
-    ),
+    components: { ...g.components },
+    nodes: Object.fromEntries(Object.entries(g.nodes).map(([k, v]) => [k, [...v]])),
+    stores: Object.fromEntries(Object.entries(g.stores).map(([k, v]) => [k, [...v]])),
   }
 }

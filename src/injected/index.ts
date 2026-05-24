@@ -40,24 +40,17 @@ if (app) {
   function refreshGraph() {
     const graphData = getGraphData();
     const plain = {
-      components: Object.fromEntries(
-        Object.entries(graphData.components).map(([comp, nodes]) => [
-          comp,
-          nodes.map((n: any) => ({
-            ...n,
-            // val: sanitizeVal(n.val, n.type),
-            val: "", // 暫時不顯示資料
-          })),
+      components: graphData.components,
+      nodes: Object.fromEntries(
+        Object.entries(graphData.nodes).map(([uid, nodes]) => [
+          uid,
+          nodes.map((n: any) => ({ ...n, val: '' })),
         ]),
       ),
       stores: Object.fromEntries(
         Object.entries(graphData.stores).map(([storeId, nodes]) => [
           storeId,
-          nodes.map((n: any) => ({
-            ...n,
-            // val: sanitizeVal(n.val, n.type),
-            val: "", // 暫時不顯示資料
-          })),
+          nodes.map((n: any) => ({ ...n, val: '' })),
         ]),
       ),
     };

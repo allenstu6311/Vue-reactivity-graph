@@ -19,13 +19,11 @@ const filteredNodes = computed(() => {
   if (!keyword) return null  // null = 顯示完整樹
 
   const result: TreeNode[] = []
-  for (const [uid, nodes] of Object.entries(props.graph.components)) {
-    const sentinel = nodes[0]
-    if (!sentinel || sentinel.type !== 'component') continue
-    if ((sentinel.name ?? '').toLowerCase().includes(keyword)) {
+  for (const [uid, meta] of Object.entries(props.graph.components)) {
+    if (meta.name.toLowerCase().includes(keyword)) {
       result.push({
         uid,
-        name: sentinel.name ?? '',
+        name: meta.name,
         path: '',
         children: [],
       })
@@ -38,22 +36,18 @@ const treeStructure = computed(() => {
   const root: TreeNode[] = []
   const uidToNode = new Map<string, TreeNode>()
 
-  for (const [uid, nodes] of Object.entries(props.graph.components)) {
-    const sentinel = nodes[0]
-    if (!sentinel || sentinel.type !== 'component') continue
-    const { path = '', name = '' } = sentinel
-    uidToNode.set(uid, { uid, name, path, children: [] })
+  // 第一輪：建立所有 uid → TreeNode
+  for (const [uid, meta] of Object.entries(props.graph.components)) {
+    uidToNode.set(uid, { uid, name: meta.name, path: meta.path, children: [] })
   }
 
-  for (const [uid, nodes] of Object.entries(props.graph.components)) {
-    const sentinel = nodes[0]
-    if (!sentinel || sentinel.type !== 'component') continue
+  // 第二輪：接 parent/children
+  for (const [uid, meta] of Object.entries(props.graph.components)) {
     const node = uidToNode.get(uid)!
-    const parentUid = sentinel.parentUid
-    if (parentUid === undefined) {
+    if (meta.parentUid === undefined) {
       root.push(node)
     } else {
-      const parent = uidToNode.get(parentUid.toString())
+      const parent = uidToNode.get(meta.parentUid.toString())
       if (parent) parent.children.push(node)
       else root.push(node)
     }

@@ -12,30 +12,27 @@ import { NODE_TYPES } from './nodeTypeMeta'
 
 type RightMode = 'select' | 'graph'
 
-const graph = ref<GraphData>({ components: {}, stores: {} })
+const graph = ref<GraphData>({ components: {}, nodes: {}, stores: {} })
 const selectedUid = ref<string>('')
 const selectedId = ref<string | null>(null)
 const activeTab = ref<Tab>(TAB.Components)
 const rightMode = ref<RightMode>('select')
 const searchQuery = ref('')
 
-const currentNodes = computed(() => graph.value.components[selectedUid.value] ?? [])
+const currentNodes = computed(() => graph.value.nodes[selectedUid.value] ?? [])
 const allNodes = computed(() => [
-  ...Object.values(graph.value.components).flat(),
+  ...Object.values(graph.value.nodes).flat(),
   ...Object.values(graph.value.stores).flat(),
 ])
 
 const selectedComponentName = computed(() => {
-  const nodes = graph.value.components[selectedUid.value]
-  const sentinel = nodes?.[0]
-  if (!sentinel || sentinel.type !== 'component') return null
-  return sentinel.name ?? null
+  return graph.value.components[selectedUid.value]?.name ?? null
 })
 
 function onSelectComponent(uid: string) {
   selectedUid.value = uid
   rightMode.value = 'graph'
-  const nodes = graph.value.components[uid] ?? []
+  const nodes = graph.value.nodes[uid] ?? []
   let firstId: string | null = null
   for (const type of NODE_TYPES) {
     const found = nodes.find(n => n.type === type)

@@ -4,18 +4,18 @@ import { getGraphData } from "../../graph";
 import { createNode } from "../helper/nodes";
 import { linkNodes } from "../subscribers/shared";
 
-// DFS 時序契約：anonymous provide node 建立後直接寫入 getGraphData().components[parent!.uid.toString()]。
-// 此陣列由父層 updateComponent(parent!.uid.toString(), nodes) 建立——DFS 保證父層 collectInstance
+// DFS 時序契約：anonymous provide node 建立後直接寫入 getGraphData().nodes[parent!.uid.toString()]。
+// 此陣列由父層 updateNodes(parent!.uid.toString(), nodes) 建立——DFS 保證父層 collectInstance
 // 完整執行完才輪到子層。
 //
 // 若順序被破壞（子層先於父層執行）：
-//   getGraphData().components[parent!.uid.toString()] 為 undefined → ?.push() 靜默 no-op，不拋錯。
+//   getGraphData().nodes[parent!.uid.toString()] 為 undefined → ?.push() 靜默 no-op，不拋錯。
 //   anonymous node 不會進入父層 graph，但 valNodeMap 寫入仍成功（ctx.valNodeMap.set 正常執行）。
 //   後果：Phase 2 的 resolveDepNode 仍可從 valNodeMap 找到這個 node，
 //   但 DevTools panel 渲染的父層節點清單會缺少此 anonymous node——圖形不完整且難以察覺。
 //
 // anonymous node 建立後需同時執行三個寫入（維持現況行為）：
-//   1. getGraphData().components[parent!.uid.toString()]?.push(parentNode)
+//   1. getGraphData().nodes[parent!.uid.toString()]?.push(parentNode)
 //   2. ctx.valNodeMap.set(lookupKey, parentNode)
 //   3. ctx.propSourceInjectMap.set(injectRaw, injectNode)
 export function collectInject(params: CollectInjectParams): Set<string> {
@@ -62,7 +62,7 @@ export function collectInject(params: CollectInjectParams): Set<string> {
         val: lookupKey,
         filePath: parentFilePath,
       });
-      getGraphData().components[parent!.uid.toString()]?.push(parentNode);
+      getGraphData().nodes[parent!.uid.toString()]?.push(parentNode);
       ctx.valNodeMap.set(lookupKey, parentNode);
     }
 

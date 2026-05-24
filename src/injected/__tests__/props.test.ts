@@ -89,7 +89,7 @@ describe('Phase 3 — Props 基礎傳遞', () => {
   it('ref → prop（同名）：prop node 連回父層 ref', () => {
     const graph = runWalker(SameNameParent)
     const parent = getComponentNodes(graph, 'SameNameParent')
-    const childPath = Object.values(graph.components).find(n => n[0]?.path?.includes('SameNameChild'))?.[0]?.path
+    const childPath = Object.values(graph.components).find(m => m.path?.includes('SameNameChild'))?.path
     const child = getComponentNodes(graph, childPath || 'SameNameParent.SameNameChild')
 
     expect(parent).toBeDefined()
@@ -383,13 +383,16 @@ describe('Phase 3 — Props 基礎傳遞', () => {
     const graph = runWalker(DupParent)
     const parent = getComponentNodes(graph, 'DupParent')
     const child0 = getComponentNodes(graph, 'DupParent.DupChild')
-    const child1 = getComponentNodes(graph, 'DupParent.DupChild')  // 同樣的 path，不帶 _N
 
     expect(child0).toBeDefined()
     // 找到兩個不同的 uid
-    const allChildren = Object.values(graph.components).filter((nodes) =>
-      nodes[0]?.path === 'DupParent.DupChild' && nodes[0]?.uid !== child0[0]?.uid
+    const child0Uid = Object.keys(graph.components).find(uid =>
+      graph.components[uid].path === 'DupParent.DupChild' &&
+      graph.nodes[uid] === child0
     )
+    const allChildren = Object.entries(graph.components)
+      .filter(([uid, meta]) => meta.path === 'DupParent.DupChild' && uid !== child0Uid)
+      .map(([uid]) => graph.nodes[uid] ?? [])
     expect(allChildren.length > 0).toBe(true)
     const child1Nodes = allChildren[0]
 

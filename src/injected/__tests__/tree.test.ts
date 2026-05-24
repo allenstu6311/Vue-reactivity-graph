@@ -33,13 +33,11 @@ describe('ComponentTree parentUid — 同名元件多次使用', () => {
   it('每個 sentinel 的 parentUid 正確指向各自的父層 uid', () => {
     const graph = runWalker(App)
 
-    // 從 graph 取出所有 sentinel nodes
-    const sentinels = Object.values(graph.components)
-      .map(nodes => nodes[0])
-      .filter(n => n?.type === 'component')
+    // 從 graph.components 取出所有 meta
+    const metas = Object.values(graph.components)
 
     // 依 name 分組
-    const byName = (name: string) => sentinels.filter(n => n.name === name)
+    const byName = (name: string) => metas.filter(m => m.name === name)
 
     const appNodes = byName('App')
     const homeNodes = byName('HomeView')
@@ -50,7 +48,7 @@ describe('ComponentTree parentUid — 同名元件多次使用', () => {
     expect(homeNodes).toHaveLength(3)
     expect(aboutNodes).toHaveLength(3)
 
-    const appUid = appNodes[0].uid!
+    const appUid = appNodes[0].uid
 
     // 三個 HomeView 的 parentUid 都指向 App
     for (const home of homeNodes) {
@@ -58,8 +56,8 @@ describe('ComponentTree parentUid — 同名元件多次使用', () => {
     }
 
     // 每個 AboutView 的 parentUid 各自指向不同的 HomeView（一對一關係）
-    const homeUids = homeNodes.map(n => n.uid!)
-    const aboutParentUids = aboutNodes.map(n => n.parentUid!)
+    const homeUids = homeNodes.map(m => m.uid)
+    const aboutParentUids = aboutNodes.map(m => m.parentUid!)
 
     // 每個 AboutView 都有一個 parentUid
     expect(aboutParentUids.every(uid => uid !== undefined)).toBe(true)

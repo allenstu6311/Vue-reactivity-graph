@@ -58,19 +58,32 @@ pnpm vitest run src/injected/__tests__/props.test.ts
 
 詳細型別定義見 `src/graph/types.ts`。
 
-每個節點（`GraphNode`）：
-- `id`：`${uid}.${varName}`，全域唯一（uid 為 Vue component instance 的內部 uid）
-- `type`：`ref` | `reactive` | `computed` | `watch` | `component`（sentinel）
-- `val`：當前值（字串表示）
-- `file`：來源檔案（如 `CartPanel.vue`）
-- `uid`：所屬 component 的 Vue uid（sentinel node 專用欄位）
-- `parentUid`：父層 component 的 Vue uid（sentinel node 專用欄位）
-- `name`：component 名稱（sentinel node 專用欄位）
-- `path`：component 路徑，同名元件加 `_N` 後綴（sentinel node 專用欄位）
+**`ComponentMeta`**：元件 metadata，存放於 `GraphData.components`，key 為 uid string。
+- `uid`：Vue component instance 的內部 uid
+- `parentUid`：父層 component 的 uid（root 為 undefined）
+- `name`：component 名稱，例如 `"HomeView"`
+- `path`：祖先路徑，例如 `"App.HomeView"`
+- `filePath`：來源檔案絕對路徑
+
+**`GraphNode`**：變數節點，存放於 `GraphData.nodes`，key 為 uid string，值為節點陣列（不含 sentinel）。
+- `id`：`${uid}.${varName}`，全域唯一
+- `type`：`ref` | `reactive` | `computed` | `watch` | `store` | `prop` | `inject`
+- `val`：當前值（序列化前為實際值，序列化後清空為 `''`）
+- `filePath`：來源檔案絕對路徑
+- `name`：所屬 component 名稱
+- `uid`：所屬 component 的 Vue uid（store 節點可選）
+- `path`：所屬 component 的祖先路徑
 - `deps`：依賴節點的完整 id（`uid.varName` 格式），computed / watch 有
 - `subs`：訂閱者節點的完整 id（`uid.varName` 格式），ref / reactive / computed 有
 
-整體結構為 `GraphData.components: Record<string, GraphNode[]>`，key 為 uid string。每個 component 的 `nodes[0]` 為 `type: 'component'` 的 sentinel node，記錄 uid / parentUid / name / path 元資料，ComponentTree 據此重建樹形結構。
+**整體結構**：
+```typescript
+GraphData {
+  components: Record<string, ComponentMeta>   // uid → 元件 metadata
+  nodes:      Record<string, GraphNode[]>     // uid → 變數節點（不含 sentinel）
+  stores:     Record<string, GraphNode[]>     // storeId → store 節點
+}
+```
 
 ---
 
@@ -83,7 +96,7 @@ pnpm vitest run src/injected/__tests__/props.test.ts
 | `injected/walker.ts` | 核心：traverseVNode（DFS 遍歷）、runScan（封裝完整掃描流程）、collectInstance、triggerInstance |
 | `injected/context/WalkContext.ts` | WalkContext class：六個 walker-scoped map、`resolveComponentKey`、`resolveInstance`、`reset`；`extractInstanceData` 函數 |
 | `injected/context/types.ts` | `InstanceData` 介面 |
-| `injected/helper/nodes.ts` | `buildNode`、`setValNode`：GraphNode 建立與寫入 valNodeMap |
+| `injected/helper/nodes.ts` | `createNode`、`detectNodeType`、`setValNode`：GraphNode 建立、型別偵測與寫入 valNodeMap |
 | `injected/helper/resolve.ts` | `resolveDepName`、`resolveDepNode`、`isPiniaStoreProxy`、`isStoreToRefsRef` |
 | `injected/helper/types.ts` | 各函數參數介面：`CollectSetupStateParams`、`ResolveDepNodeParams`、`BindSetupTrackParams`、`BaseCollectParams` |
 | `injected/collect/types.ts` | collect 子模組的參數介面：`CollectPropsParams`、`CollectInjectParams`、`CollectSetupParams`、`CollectWatchParams`、`SentinelDryRunParams` |
@@ -96,8 +109,8 @@ pnpm vitest run src/injected/__tests__/props.test.ts
 | `injected/subscribers/shared.ts` | `linkNodes`、`createOnTrackHandler` |
 | `injected/subscribers/computed.ts` | `bindComputedTrack`（Phase 2 computed onTrack 綁定） |
 | `injected/subscribers/watch.ts` | `bindWatchTrack`（Phase 2 watch onTrack 綁定） |
-| `graph/types.ts` | 純型別：NodeType, GraphNode, ComponentGraph |
-| `graph/index.ts` | graph 全域狀態 + getGraph / updateGraph / notifyUpdate |
+| `graph/types.ts` | 純型別：NodeType, GraphNode, ComponentMeta, GraphData |
+| `graph/index.ts` | graph 全域狀態 + getGraphData / updateComponent / updateNodes / updateStore / clearGraph |
 | `types/vue-internals.d.ts` | Vue 未公開內部型別（ComputedRefImpl, ExtendedComponentInstance 等） |
 | `content/index.ts` | 注入 injected.js 到頁面，轉發 postMessage 給 background |
 | `background/index.ts` | 管理 devtools port，廣播 VUE_GRAPH_UPDATE |

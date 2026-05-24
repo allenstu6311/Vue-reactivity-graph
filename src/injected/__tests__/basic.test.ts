@@ -35,8 +35,8 @@ describe('Phase 1 — 單一元件基礎驗證', () => {
     const graph = runWalker(TestComp)
     const nodes = getComponentNodes(graph, 'TestComp')
     expect(nodes).toBeDefined()
-    // 節點數量：sentinel (component) + count (ref) + items (reactive) + double (computed) + label (computed) + listLen (computed) + w_0 (watch) + w_1 (watch) = 8
-    expect(nodes).toHaveLength(8)
+    // 節點數量：count (ref) + items (reactive) + double (computed) + label (computed) + listLen (computed) + w_0 (watch) + w_1 (watch) = 7
+    expect(nodes).toHaveLength(7)
 
     const get = (varName: string) => nodes.find(n => n.varName === varName)!
 

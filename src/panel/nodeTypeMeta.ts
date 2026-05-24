@@ -5,7 +5,6 @@ export const NODE_TYPE_META = {
   reactive:  { label: 'reactive',  color: '#fb923c', background: 'rgba(251,146,60,.08)',  border: 'rgba(251,146,60,.28)'  },
   computed:  { label: 'computed',  color: '#60a5fa', background: 'rgba(96,165,250,.08)',  border: 'rgba(96,165,250,.28)'  },
   watch:     { label: 'watch',     color: '#c084fc', background: 'rgba(192,132,252,.08)', border: 'rgba(192,132,252,.28)' },
-  component: { label: 'component', color: '#c084fc', background: 'rgba(192,132,252,.08)', border: 'rgba(192,132,252,.28)', hidden: true },
   store:     { label: 'store',     color: '#f472b6', background: 'rgba(244,114,182,.08)', border: 'rgba(244,114,182,.28)' },
   prop:      { label: 'prop',      color: '#2dd4bf', background: 'rgba(45,212,191,.08)',  border: 'rgba(45,212,191,.28)'  },
   inject:    { label: 'inject',    color: '#facc15', background: 'rgba(250,204,21,.08)',   border: 'rgba(250,204,21,.28)'  },

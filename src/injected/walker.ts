@@ -6,7 +6,7 @@ import type {
 import { bindComputedTrack } from "./subscribers/computed";
 import { bindWatchTrack } from "./subscribers/watch";
 import { isStoreToRefsRef } from "./helper/resolve";
-import { GraphNode, updateComponent, updateStore, getGraphData, clearGraph } from "../graph";
+import { GraphNode, updateComponent, updateNodes, updateStore, getGraphData, clearGraph } from "../graph";
 import { WalkContext, extractInstanceData } from "./context/WalkContext";
 import { runSentinelDryRun } from "./collect/sentinel";
 import { collectProps } from "./collect/props";
@@ -31,20 +31,6 @@ export function collectInstance({
   const { key, path } = ctx.resolveComponentKey(parent?.path, name, instance.uid);
   const nodes: GraphNode[] = [];
 
-  // 插入 metadata sentinel node
-  nodes.push({
-    id: key,
-    uid: instance.uid,
-    parentUid: parent?.uid,
-    name,
-    path,
-    type: 'component',
-    val: null,
-    filePath,
-    deps: [],
-    subs: [],
-  });
-
   // 1. run sentinel dry-run（寫入 ctx.instanceChildPropKeyMap，子層 collectProps 會讀）
   runSentinelDryRun({ instance, rawSetupState, propsOptions, ctx });
 
@@ -61,7 +47,8 @@ export function collectInstance({
   // 6. collect watch
   collectWatch({ instance, uid: instance.uid, name, path, filePath, nodes, watchEffects });
 
-  updateComponent(key, nodes);
+  updateComponent(key, { uid: instance.uid, parentUid: parent?.uid, name, path, filePath });
+  updateNodes(key, nodes);
   // DFS：遞迴處理子元件樹，確保 DFS 順序維持不變
   traverseVNode(instance.subTree, { uid: instance.uid, path }, ctx, collectInstance);
 }
@@ -104,7 +91,8 @@ export function triggerInstance({
 
   const key = instance.uid.toString();
 
-  const nodes = getGraphData().components[key] ?? [];
+  const meta = getGraphData().components[key];
+  const nodes = getGraphData().nodes[key] ?? [];
 
   // 每次 triggerInstance 重建，避免兄弟 component inject 同一個值時，A 的追蹤連到 B 的節點
   const injectRawToLocalNode = new Map<object, GraphNode>();
@@ -135,8 +123,8 @@ export function triggerInstance({
     bindComputedTrack({
       rawSetupState,
       uid: instance.uid,
-      name: nodes[0]?.name ?? '',
-      path: nodes[0]?.path ?? '',
+      name: meta?.name ?? '',
+      path: meta?.path ?? '',
       valNodeMap: ctx.valNodeMap,
       propKeyNodeMap: ctx.propKeyNodeMap,
       injectRawToLocalNode,
@@ -156,7 +144,7 @@ export function triggerInstance({
     });
   }
 
-  traverseVNode(instance.subTree, { uid: instance.uid, path: nodes[0]?.path ?? '' }, ctx, triggerInstance);
+  traverseVNode(instance.subTree, { uid: instance.uid, path: meta?.path ?? '' }, ctx, triggerInstance);
 }
 
 export function runScan(root: ExtendedComponentInstance, ctx: WalkContext): void {

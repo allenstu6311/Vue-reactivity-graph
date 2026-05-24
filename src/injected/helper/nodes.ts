@@ -37,7 +37,6 @@ export function setValNode(
 export function detectNodeType(val: ReactiveTarget): NodeType | null {
   if (val?.effect) return "computed";
   if (val?.__v_isRef) return "ref";
-  if (val?.setup) return "component";
-  if (val.__v_isReactive) return "reactive";
+  if (val?.__v_isReactive) return "reactive";
   return null;
 }
