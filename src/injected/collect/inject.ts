@@ -3,7 +3,7 @@ import type { GraphNode } from "../../graph";
 import { getGraphData } from "../../graph";
 import { createNode } from "../helper/nodes";
 import { linkNodes } from "../subscribers/shared";
-import { isObject, isSymbol } from "../../shared/guards";
+import { isObject, isSymbol } from "../helper/guards";
 
 // DFS 時序契約：anonymous provide node 建立後直接寫入 getGraphData().nodes[parent!.uid.toString()]。
 // 此陣列由父層 updateNodes(parent!.uid.toString(), nodes) 建立——DFS 保證父層 collectInstance

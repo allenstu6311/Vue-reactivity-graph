@@ -1,6 +1,6 @@
 import type { GraphNode, NodeType } from "../../graph";
 import type { ReactiveTarget } from "../../types/vue-internals";
-import { isObject } from "../../shared/guards";
+import { isObject } from "./guards";
 
 export function getRaw<T>(val: T): T {
   return (val as any)?.__v_raw ?? val;
