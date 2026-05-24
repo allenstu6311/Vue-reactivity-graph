@@ -16,7 +16,7 @@ import { linkNodes } from "../subscribers/shared";
 //
 // anonymous node 建立後需同時執行三個寫入（維持現況行為）：
 //   1. getGraphData().nodes[parent!.uid.toString()]?.push(parentNode)
-//   2. ctx.valNodeMap.set(lookupKey, parentNode)
+//   2. ctx.valNodeMap.set(rawOrVal, parentNode)
 //   3. ctx.propSourceInjectMap.set(injectRaw, injectNode)
 export function collectInject(params: CollectInjectParams): Set<string> {
   const { instance, uid, name, path, parent, filePath, nodes, ctx, rawSetupState } = params;
@@ -42,10 +42,8 @@ export function collectInject(params: CollectInjectParams): Set<string> {
     const val = parentProvides[key];
     if (typeof val !== "object" || val === null) continue;
     const raw = (val as any).__v_raw;
-    const lookupKey = (raw && typeof raw === "object" ? raw : val) as object;
-    let parentNode =
-      (raw && typeof raw === "object" ? ctx.valNodeMap.get(raw as object) : undefined) ??
-      ctx.valNodeMap.get(val as object);
+    const rawOrVal = (raw && typeof raw === "object") ? raw : val;
+    let parentNode = ctx.valNodeMap.get(rawOrVal);
 
     if (!parentNode) {
       const keyStr =
@@ -59,11 +57,11 @@ export function collectInject(params: CollectInjectParams): Set<string> {
         path: parent!.path,
         varName: "anonymous",
         type: (val as any).__v_isRef ? "ref" : "reactive",
-        val: lookupKey,
+        val: rawOrVal,
         filePath: parentFilePath,
       });
       getGraphData().nodes[parent!.uid.toString()]?.push(parentNode);
-      ctx.valNodeMap.set(lookupKey, parentNode);
+      ctx.valNodeMap.set(rawOrVal, parentNode);
     }
 
     provideRawToNode.set(val, parentNode);
