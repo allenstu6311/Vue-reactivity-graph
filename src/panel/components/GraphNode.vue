@@ -36,9 +36,9 @@ function truncate(str: string, max: number) {
       {{ truncate(getDisplayName(data), 18) }}
     </div>
     <div class="n-file">{{ truncate(data.name, 22) }}</div>
-    <div v-if="data.val && data.val !== '—'" class="n-val">
+    <!-- <div v-if="data.val && data.val !== '—'" class="n-val">
       {{ truncate(String(data.val), 14) }}
-    </div>
+    </div> -->
   </div>
   <Handle type="source" :position="Position.Right" />
   <!-- <Handle type="source" :position="Position.Left" />
