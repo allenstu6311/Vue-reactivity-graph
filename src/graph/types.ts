@@ -16,6 +16,7 @@ export interface GraphNode {
   path?: string      // 祖先路徑，例如 "App.HomeView"（不帶 _N）
   varName?: string  // 變數短名
   type: NodeType
+  subtype?: NodeType   // 僅 store 節點設定，紀錄底下真實 reactive type
   val: unknown
   filePath: string
   deps: string[]  // 依賴節點的完整 id（uid-based 格式，例如 "12.price"），computed / watch 有

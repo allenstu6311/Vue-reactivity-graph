@@ -22,6 +22,7 @@ export function createNode(params: {
   id: string;
   varName: string;
   type: NodeType;
+  subtype?: NodeType;
   val: unknown;
   filePath: string;
   name: string;

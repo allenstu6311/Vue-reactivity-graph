@@ -132,12 +132,15 @@ describe('Phase 2 — Pinia Store 追蹤', () => {
 
     // ref：Phase 1 靜態建立連結
     expect(getStore('count').type).toBe('store')
+    expect(getStore('count').subtype).toBe('ref')
     expect(getStore('count').subs).toStrictEqual([makeId(graph, 'TestComp', 'count')])
     // reactive：Phase 1 靜態建立連結
     expect(getStore('items').type).toBe('store')
+    expect(getStore('items').subtype).toBe('reactive')
     expect(getStore('items').subs).toStrictEqual([makeId(graph, 'TestComp', 'items')])
     // computed
     expect(getStore('double').type).toBe('store')
+    expect(getStore('double').subtype).toBe('computed')
     expect(getStore('double').subs).toStrictEqual([makeId(graph, 'TestComp', 'double')])
   })
 })

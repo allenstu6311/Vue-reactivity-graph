@@ -76,10 +76,12 @@ export function collectPiniaState(
       if (key.startsWith("$") || key.startsWith("_")) continue;
       const val = raw[key];
       if (!isObject(val)) continue;
+      const subtype = detectNodeType(val as ReactiveTarget) ?? undefined;
       const node = createNode({
         id: `${storeId}.${key}`,
         varName: key,
         type: "store",
+        subtype,
         val,
         name: storeId,
         filePath: '',

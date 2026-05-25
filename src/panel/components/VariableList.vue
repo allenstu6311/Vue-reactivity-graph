@@ -72,7 +72,7 @@ const grouped = computed(() => {
           :class="{ active: selectedId === node.id }"
           @click="emit('select', node.id)"
         >
-          <span class="tbadge" :class="`tb-${node.type}`">{{ NODE_TYPE_META[node.type].label }}</span>
+          <span class="tbadge" :class="`tb-${node.subtype ?? node.type}`">{{ NODE_TYPE_META[node.subtype ?? node.type].label }}</span>
           <span class="var-name">{{ getDisplayName(node) }}</span>
           <!-- <span class="var-cnt" :class="{ lit: getCount(node) > 0 }">{{ getCount(node) }}</span> -->
         </div>
