@@ -58,7 +58,7 @@ const grouped = computed(() => {
       />
     </div>
     <div class="left-list">
-      <template v-for="group in grouped" :key="group.type">
+      <template v-for="group in grouped" :key="group.label">
         <div
           class="sec-header"
           :style="{ color: group.config.color, borderLeft: `2px solid ${group.config.color}` }"
@@ -72,7 +72,7 @@ const grouped = computed(() => {
           :class="{ active: selectedId === node.id }"
           @click="emit('select', node.id)"
         >
-          <span class="tbadge" :class="`tb-${node.type}`">{{ group.config.label }}</span>
+          <span class="tbadge" :class="`tb-${node.type}`">{{ NODE_TYPE_META[node.type].label }}</span>
           <span class="var-name">{{ getDisplayName(node) }}</span>
           <!-- <span class="var-cnt" :class="{ lit: getCount(node) > 0 }">{{ getCount(node) }}</span> -->
         </div>
@@ -155,6 +155,7 @@ const grouped = computed(() => {
 .tb-reactive { background: rgba(251,146,60,.08);  color: #fb923c; border: 1px solid rgba(251,146,60,.28); }
 .tb-computed { background: rgba(96,165,250,.08);  color: #60a5fa; border: 1px solid rgba(96,165,250,.28); }
 .tb-watch    { background: rgba(192,132,252,.08); color: #c084fc; border: 1px solid rgba(192,132,252,.28); }
+.tb-store    { background: rgba(244,114,182,.08); color: #f472b6; border: 1px solid rgba(244,114,182,.28); }
 
 .var-name {
   font-family: 'JetBrains Mono', monospace;

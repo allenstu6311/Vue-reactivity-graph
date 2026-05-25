@@ -131,9 +131,13 @@ describe('Phase 2 — Pinia Store 追蹤', () => {
     const getStore = (varName: string) => storeNodes.find(n => n.varName === varName)!
 
     // ref：Phase 1 靜態建立連結
+    expect(getStore('count').type).toBe('store')
     expect(getStore('count').subs).toStrictEqual([makeId(graph, 'TestComp', 'count')])
     // reactive：Phase 1 靜態建立連結
+    expect(getStore('items').type).toBe('store')
     expect(getStore('items').subs).toStrictEqual([makeId(graph, 'TestComp', 'items')])
+    // computed
+    expect(getStore('double').type).toBe('store')
     expect(getStore('double').subs).toStrictEqual([makeId(graph, 'TestComp', 'double')])
   })
 })

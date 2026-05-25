@@ -6,6 +6,18 @@ export function getRaw<T>(val: T): T {
   return (val as any)?.__v_raw ?? val;
 }
 
+function toRaw<T>(val: T): T {
+  const raw = val && (val as any).__v_raw;
+  return raw ? toRaw(raw) : val;
+}
+
+function unref(val: unknown): unknown {
+  if (isObject(val) && (val as any).__v_isRef === true) {
+    return unref((val as any)._value)
+  }
+  return val
+}
+
 export function createNode(params: {
   id: string;
   varName: string;
@@ -40,4 +52,28 @@ export function detectNodeType(val: ReactiveTarget): NodeType | null {
   if (val?.__v_isRef) return "ref";
   if (val?.__v_isReactive) return "reactive";
   return null;
+}
+
+export const isStoreNode = (node: GraphNode): boolean => node.type === "store";
+
+export function snapshot(val: unknown, seen = new WeakSet<object>()): unknown {
+  // 兩種包裝都要剝：
+  // - unref 把 ref/computed 變成裡面的值（避免遞迴進 Vue 內部結構）
+  // - toRaw 把 reactive proxy 變成 raw target（避免觸發 proxy get trap / track）
+  const raw = toRaw(unref(val))
+
+  if (!isObject(raw)) return raw
+  if (seen.has(raw)) return '[Circular]'
+  seen.add(raw)
+
+  if (Array.isArray(raw)) {
+    return raw.map(item => snapshot(item, seen))
+  }
+
+  const out: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(raw)) {
+    if (key.startsWith('__v_')) continue
+    out[key] = snapshot(value, seen)
+  }
+  return out
 }

@@ -1,6 +1,7 @@
 import type { ComputedRefImpl } from "../../types/vue-internals"
 import type { BindComputedTrackParams } from "./types"
 import { createOnTrackHandler } from "./shared"
+import { isStoreNode } from "../helper/nodes"
 
 function markComputedDirtyAndEval(val: ComputedRefImpl): void {
   val.flags |= 1 << 4
@@ -26,7 +27,7 @@ export function bindComputedTrack({
     if (computedImpl?.effect) {
       const subNode = valNodeMap.get(computedImpl as object)
       // skip store-owned computed — they belong to Pinia, not this component
-      if (!subNode || subNode.type === "store") continue
+      if (!subNode || isStoreNode(subNode)) continue
 
       computedImpl.onTrack = createOnTrackHandler(subNode, subNode.id, {
         uid,

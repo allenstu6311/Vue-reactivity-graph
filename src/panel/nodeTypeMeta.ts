@@ -10,5 +10,4 @@ export const NODE_TYPE_META = {
   inject:    { label: 'inject',    color: '#facc15', background: 'rgba(250,204,21,.08)',   border: 'rgba(250,204,21,.28)'  },
 } as const satisfies Record<NodeType, object>
 
-export const NODE_TYPES = (Object.keys(NODE_TYPE_META) as NodeType[])
-  .filter(k => !(NODE_TYPE_META[k] as { hidden?: boolean }).hidden)
+export const NODE_TYPES: NodeType[] = ['ref', 'reactive', 'computed', 'watch', 'store', 'prop', 'inject']

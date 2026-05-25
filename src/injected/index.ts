@@ -5,7 +5,7 @@ import { WalkContext } from "./context/WalkContext";
 import { patchHmrRuntime, setupHmrHook } from "./hmr";
 import type { VueAppInternals } from "../types/vue-internals";
 import { getGraphData, setOnUpdate } from "../graph";
-import type { NodeType } from "../graph";
+import { snapshot } from "./helper/nodes";
 
 const appEl = document.querySelector("#app") as
   | (Element & VueAppInternals)
@@ -19,24 +19,6 @@ const originalEmit = hook.emit.bind(hook);
 if (app) {
   const ctx = new WalkContext();
 
-  function sanitizeVal(val: unknown, type: NodeType): unknown {
-    switch (type) {
-      case "ref":
-      case "computed":
-      case "store":
-        return (val as any)?._value;
-      case "reactive":
-        return { ...(val as object) };
-      case "watch":
-        return "";
-      case "inject":
-        // inject 可能是 ref（有 _value）或 reactive（無 _value，展開物件）
-        return (val as any)?._value !== undefined
-          ? (val as any)._value
-          : { ...(val as object) };
-    }
-  }
-
   function refreshGraph() {
     const graphData = getGraphData();
     const plain = {
@@ -44,13 +26,13 @@ if (app) {
       nodes: Object.fromEntries(
         Object.entries(graphData.nodes).map(([uid, nodes]) => [
           uid,
-          nodes.map((n: any) => ({ ...n, val: '' })),
+          nodes.map((n: any) => ({ ...n, val: snapshot(n.val) })),
         ]),
       ),
       stores: Object.fromEntries(
         Object.entries(graphData.stores).map(([storeId, nodes]) => [
           storeId,
-          nodes.map((n: any) => ({ ...n, val: '' })),
+          nodes.map((n: any) => ({ ...n, val: snapshot(n.val) })),
         ]),
       ),
     };
