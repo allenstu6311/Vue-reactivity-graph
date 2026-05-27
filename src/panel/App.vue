@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import VariableList from './components/VariableList.vue'
 import GraphView from './components/GraphView.vue'
 import ComponentTree from './components/ComponentTree.vue'
+import NodeDetail from './components/NodeDetail.vue'
 import type { GraphData } from '../graph'
 import { useGraphFetcher } from './composables/useGraphFetcher'
 import { useDevtoolsConnection } from './composables/useDevtoolsConnection'
@@ -18,6 +19,7 @@ const selectedId = ref<string | null>(null)
 const activeTab = ref<Tab>(TAB.Components)
 const rightMode = ref<RightMode>('select')
 const searchQuery = ref('')
+const leftTab = ref<'list' | 'detail'>('list')
 
 const currentNodes = computed(() => graph.value.nodes[selectedUid.value] ?? [])
 const allNodes = computed(() => [
@@ -29,6 +31,10 @@ const selectedComponentName = computed(() => {
   return graph.value.components[selectedUid.value]?.name ?? null
 })
 
+const detailNode = computed(
+  () => allNodes.value.find(n => n.id === selectedId.value) ?? null
+)
+
 function onSelectComponent(uid: string) {
   selectedUid.value = uid
   rightMode.value = 'graph'
@@ -39,11 +45,13 @@ function onSelectComponent(uid: string) {
     if (found) { firstId = found.id; break }
   }
   selectedId.value = firstId
+  leftTab.value = 'list'
 }
 
 function onSelectTab(tab: Tab) {
   activeTab.value = tab
   if (tab === TAB.Stores) rightMode.value = 'graph'
+  leftTab.value = 'list'
 }
 
 function toggleComponentTree() {
@@ -53,6 +61,11 @@ function toggleComponentTree() {
 function onSelectVariable(id: string) {
   selectedId.value = id
   rightMode.value = 'graph'
+}
+
+function onGraphNodeSelect(id: string) {
+  selectedId.value = id
+  leftTab.value = 'detail'
 }
 
 const { fetchGraph } = useGraphFetcher()
@@ -82,7 +95,7 @@ onMounted(() => {
     <div class="panel">
       <!-- LEFT: variable list -->
       <div class="left-wrapper">
-        <!-- Tab bar -->
+        <!-- Main tab bar -->
         <div class="tab-bar">
           <button :class="['tab-btn', { active: activeTab === TAB.Components }]" @click="onSelectTab(TAB.Components)">
             Components
@@ -90,6 +103,12 @@ onMounted(() => {
           <button :class="['tab-btn', { active: activeTab === TAB.Stores }]" @click="onSelectTab(TAB.Stores)">
             Stores
           </button>
+        </div>
+
+        <!-- Sub tab bar -->
+        <div class="tab-bar">
+          <button :class="['tab-btn', { active: leftTab === 'list' }]" @click="leftTab = 'list'">List</button>
+          <button :class="['tab-btn', { active: leftTab === 'detail' }]" @click="leftTab = 'detail'">Detail</button>
         </div>
 
         <!-- Selector row -->
@@ -108,10 +127,16 @@ onMounted(() => {
         </div>
 
         <VariableList
+          v-show="leftTab === 'list'"
           :nodes="activeTab === TAB.Components ? currentNodes : Object.values(graph.stores).flat()"
           :selected-id="selectedId"
           :group-by="activeTab === TAB.Stores ? 'store' : undefined"
           @select="onSelectVariable($event)"
+        />
+
+        <NodeDetail
+          v-show="leftTab === 'detail'"
+          :node="detailNode"
         />
       </div>
 
@@ -124,7 +149,7 @@ onMounted(() => {
           :selected-uid="selectedUid"
           @select="onSelectComponent"
         />
-        <GraphView v-else :nodes="allNodes" :selected-id="selectedId" />
+        <GraphView v-else :nodes="allNodes" :selected-id="selectedId" @select-node="onGraphNodeSelect" />
       </div>
     </div>
   </div>

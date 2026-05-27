@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { NodeComponent } from '@vue-flow/core'
+import type { NodeComponent, NodeMouseEvent } from '@vue-flow/core'
 import { VueFlow } from '@vue-flow/core'
 import GraphNode from './GraphNode.vue'
 import { buildLayout } from '../composables/useLayout'
@@ -12,7 +12,13 @@ const props = defineProps<{
   selectedId: string | null
 }>()
 
+const emit = defineEmits<{ selectNode: [id: string] }>()
+
 const nodeTypes: NodeTypesObject = { graphNode: GraphNode as NodeComponent }
+
+function onNodeClick({ node }: NodeMouseEvent) {
+  emit('selectNode', node.id)
+}
 
 const layout = computed(() =>
   props.selectedId ? buildLayout(props.nodes, props.selectedId) : { nodes: [], edges: [] },
@@ -39,6 +45,7 @@ const layout = computed(() =>
       :max-zoom="4"
       fit-view-on-init
       class="vue-flow-dark"
+      @node-click="onNodeClick"
     >
       <defs>
         <marker id="arr" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
