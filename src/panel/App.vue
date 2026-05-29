@@ -4,9 +4,11 @@ import VariableList from './components/VariableList.vue'
 import GraphView from './components/GraphView.vue'
 import ComponentTree from './components/ComponentTree.vue'
 import NodeDetail from './components/NodeDetail.vue'
+import Splitter from './components/Splitter.vue'
 import type { GraphData } from '../graph'
 import { useGraphFetcher } from './composables/useGraphFetcher'
 import { useDevtoolsConnection } from './composables/useDevtoolsConnection'
+import { loadLeftWidth, saveLeftWidth, LEFT_WIDTH_MIN, LEFT_WIDTH_MAX } from './composables/useLeftWidth'
 import { TAB } from './tabs'
 import type { Tab } from './tabs'
 import { NODE_TYPES } from './nodeTypeMeta'
@@ -14,6 +16,7 @@ import { NODE_TYPES } from './nodeTypeMeta'
 type RightMode = 'select' | 'graph'
 
 const graph = ref<GraphData>({ components: {}, nodes: {}, stores: {} })
+const leftWidth = ref<number>(loadLeftWidth())
 const selectedUid = ref<string>('')
 const selectedId = ref<string | null>(null)
 const activeTab = ref<Tab>(TAB.Components)
@@ -58,6 +61,10 @@ function toggleComponentTree() {
   rightMode.value = (rightMode.value === 'graph' || !selectedUid.value) ? 'select' : 'graph'
 }
 
+function persistLeftWidth() {
+  saveLeftWidth(leftWidth.value)
+}
+
 function onSelectVariable(id: string) {
   selectedId.value = id
   rightMode.value = 'graph'
@@ -94,7 +101,7 @@ onMounted(() => {
   <div class="shell">
     <div class="panel">
       <!-- LEFT: variable list -->
-      <div class="left-wrapper">
+      <div class="left-wrapper" :style="{ width: leftWidth + 'px' }">
         <!-- Main tab bar -->
         <div class="tab-bar">
           <button :class="['tab-btn', { active: activeTab === TAB.Components }]" @click="onSelectTab(TAB.Components)">
@@ -139,6 +146,13 @@ onMounted(() => {
           :node="detailNode"
         />
       </div>
+
+      <Splitter
+        v-model="leftWidth"
+        :min="LEFT_WIDTH_MIN"
+        :max="LEFT_WIDTH_MAX"
+        @drag-end="persistLeftWidth"
+      />
 
       <!-- RIGHT: graph -->
       <div class="right">
@@ -214,8 +228,8 @@ body {
 }
 
 .left-wrapper {
-  width: 252px;
   flex-shrink: 0;
+  min-width: 0;
   border-right: 1px solid #1f2e45;
   background: #111622;
   display: flex;
