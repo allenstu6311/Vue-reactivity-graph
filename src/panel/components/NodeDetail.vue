@@ -12,16 +12,16 @@ const tc = computed(() =>
   props.node ? NODE_TYPE_META[props.node.type] : null
 )
 
-function toVscodeUrl(filePath: string): string {
-  const normalized = filePath.replace(/\\/g, '/')
-  const segments = normalized.split('/')
-  const encoded = segments.map((s, i) => {
-    // 保留 Windows drive letter（第一段如 "C:"），不要 encode colon
-    if (i === 0 && /^[A-Za-z]:$/.test(s)) return s
-    return encodeURIComponent(s)
-  }).join('/')
-  return `vscode://file/${encoded}`
-}
+// function toVscodeUrl(filePath: string): string {
+//   const normalized = filePath.replace(/\\/g, '/')
+//   const segments = normalized.split('/')
+//   const encoded = segments.map((s, i) => {
+//     // 保留 Windows drive letter（第一段如 "C:"），不要 encode colon
+//     if (i === 0 && /^[A-Za-z]:$/.test(s)) return s
+//     return encodeURIComponent(s)
+//   }).join('/')
+//   return `vscode://file/${encoded}`
+// }
 </script>
 
 <template>
@@ -52,7 +52,7 @@ function toVscodeUrl(filePath: string): string {
 
       <!-- Name -->
       <div v-if="props.node.name" class="row">
-        <span class="label">Component / Store</span>
+        <span class="label">{{ props.node.type === 'store' ? 'Store' : 'Component' }}</span>
         <span class="value">{{ props.node.name }}</span>
       </div>
 
@@ -66,7 +66,8 @@ function toVscodeUrl(filePath: string): string {
       <div class="row">
         <span class="label">File</span>
         <span v-if="props.node.filePath" class="value">
-          <a :href="toVscodeUrl(props.node.filePath)">{{ props.node.filePath }}</a>
+          <!-- <a :href="toVscodeUrl(props.node.filePath)">{{ props.node.filePath }}</a> -->
+          <p>{{ props.node.filePath }}</p>
         </span>
         <span v-else class="value empty-file">—</span>
       </div>
@@ -124,7 +125,7 @@ function toVscodeUrl(filePath: string): string {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  flex-wrap: wrap;
+  /* flex-wrap: wrap; */
 }
 
 .val-row {
@@ -166,16 +167,16 @@ function toVscodeUrl(filePath: string): string {
   word-break: break-all;
 }
 
-.value a {
+/* .value p {
   color: #60a5fa;
   text-decoration: none;
   transition: color 0.15s;
-}
+} */
 
-.value a:hover {
+/* .value p:hover {
   color: #93c5fd;
   text-decoration: underline;
-}
+} */
 
 .empty-file {
   color: #4a6080;
