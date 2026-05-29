@@ -1,16 +1,17 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { GraphNode } from '../../graph'
-import { NODE_TYPE_META } from '../nodeTypeMeta'
-import ValTree from './shared/ValTree.vue'
+import { computed } from "vue";
+import type { GraphNode } from "../../graph";
+import { NODE_TYPE_META } from "../nodeTypeMeta";
+import ValTree from "./shared/ValTree.vue";
+// import { isObject } from "../../injected/helper/guards";
 
 const props = defineProps<{
-  node: GraphNode | null
-}>()
+  node: GraphNode | null;
+}>();
 
 const tc = computed(() =>
-  props.node ? NODE_TYPE_META[props.node.type] : null
-)
+  props.node ? NODE_TYPE_META[props.node.type] : null,
+);
 
 // function toVscodeUrl(filePath: string): string {
 //   const normalized = filePath.replace(/\\/g, '/')
@@ -47,12 +48,16 @@ const tc = computed(() =>
         >
           {{ tc.label }}
         </span>
-        <span v-if="props.node.varName" class="var-name">{{ props.node.varName }}</span>
+        <span v-if="props.node.varName" class="var-name">{{
+          props.node.varName
+        }}</span>
       </div>
 
       <!-- Name -->
       <div v-if="props.node.name" class="row">
-        <span class="label">{{ props.node.type === 'store' ? 'Store' : 'Component' }}</span>
+        <span class="label">{{
+          props.node.type === "store" ? "Store" : "Component"
+        }}</span>
         <span class="value">{{ props.node.name }}</span>
       </div>
 
@@ -73,10 +78,22 @@ const tc = computed(() =>
       </div>
 
       <!-- Val tree -->
-      <div class="row val-row">
-        <span class="label">Value</span>
-        <div class="val-container">
-          <ValTree :key="props.node.id" :value="props.node.val" :max-auto-expand="2" />
+      <div class="">
+        <div class="" v-if="typeof props.node.val === 'object' && props.node.val !== null">
+          <span class="label">Value</span>
+          <div
+            class="val-container">
+            <ValTree
+              :key="props.node.id"
+              :value="props.node.val"
+              :max-auto-expand="0"
+            />
+          </div>
+        </div>
+
+        <div class="row val-row" v-else>
+          <span class="label">Value</span>
+          <span>{{ props.node.val }}</span>
         </div>
       </div>
     </div>
@@ -129,7 +146,7 @@ const tc = computed(() =>
 }
 
 .val-row {
-  flex-direction: column;
+  /* flex-direction: column; */
   gap: 6px;
 }
 
@@ -137,14 +154,14 @@ const tc = computed(() =>
   font-size: 9px;
   padding: 2px 5px;
   border-radius: 3px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: "JetBrains Mono", monospace;
   font-weight: 700;
   flex-shrink: 0;
   white-space: nowrap;
 }
 
 .var-name {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 12px;
   color: #cdd9ee;
   word-break: break-all;
@@ -161,7 +178,7 @@ const tc = computed(() =>
 }
 
 .value {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 11px;
   color: #cdd9ee;
   word-break: break-all;
@@ -183,7 +200,7 @@ const tc = computed(() =>
 }
 
 .val-container {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 11px;
   padding: 6px 0;
 }
