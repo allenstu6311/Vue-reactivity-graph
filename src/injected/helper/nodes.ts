@@ -13,7 +13,10 @@ function toRaw<T>(val: T): T {
 
 function unref(val: unknown): unknown {
   if (isObject(val) && (val as any).__v_isRef === true) {
-    return unref((val as any)._value)
+    const inner = (val as any).effect
+      ? (val as any).value        // computed：強制觸發 getter
+      : (val as any)._value       // plain ref：讀私有欄位
+    return unref(inner)
   }
   return val
 }

@@ -26,17 +26,16 @@ if (app) {
       nodes: Object.fromEntries(
         Object.entries(graphData.nodes).map(([uid, nodes]) => [
           uid,
-          nodes.map((n: any) => ({ ...n, val: snapshot(n.val) })),
+          nodes.map((n) => ({ ...n, val: snapshot(n.val) })),
         ]),
       ),
       stores: Object.fromEntries(
         Object.entries(graphData.stores).map(([storeId, nodes]) => [
           storeId,
-          nodes.map((n: any) => ({ ...n, val: snapshot(n.val) })),
+          nodes.map((n) => ({ ...n, val: snapshot(n.val) })),
         ]),
       ),
     };
-    console.log("Updating graph data:", plain);
     (window as unknown as Record<string, unknown>).__vueReactivityGraph = plain;
     window.postMessage({ type: "VUE_GRAPH_UPDATE" }, "*");
   }

@@ -2,3 +2,4 @@ node_modules
 dist
 merge-report.md
 spec.md
+.claude/settings.local.json
