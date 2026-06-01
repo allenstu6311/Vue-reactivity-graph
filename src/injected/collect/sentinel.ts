@@ -1,6 +1,6 @@
 import type { RawAppContext, SentinelVNode } from "../../types/vue-internals";
 import type { SentinelDryRunParams } from "./types";
-import { isObject, isString, isSymbol, isFunction } from "../helper/guards";
+import { isObject, isString, isSymbol, isFunction } from "@/shared/helper/guards";
 
 function resolveGlobalComponent(
   appContext: RawAppContext | null | undefined,

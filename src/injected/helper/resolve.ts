@@ -1,7 +1,7 @@
 import type { GraphNode } from "../../graph";
 import { ReactiveTarget } from "../../types/vue-internals";
 import type { ResolveDepNodeParams } from "./types";
-import { isString, isFunction, isObject } from "./guards";
+import { isString, isFunction, isObject } from "@/shared/helper/guards";
 
 export function isPiniaStoreProxy(val: unknown): boolean {
   return (

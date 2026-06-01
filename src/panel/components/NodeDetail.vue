@@ -4,7 +4,6 @@ import type { GraphNode } from "../../graph";
 import { NODE_TYPE_META } from "../nodeTypeMeta";
 import ValTree from "./shared/ValTree.vue";
 import { formatLeafValue } from "./shared/nodeDisplay";
-// import { isObject } from "../../injected/helper/guards";
 
 const props = defineProps<{
   node: GraphNode | null;

@@ -7,7 +7,7 @@ import { detectNodeType, createNode, setValNode } from "../helper/nodes";
 import { isStoreToRefsRef, isPiniaStoreProxy } from "../helper/resolve";
 import { linkNodes } from "../subscribers/shared";
 import type { CollectSetupParams } from "./types";
-import { isObject } from "../helper/guards";
+import { isObject } from "@/shared/helper/guards";
 
 // Phase 1: 建 node、存 valNodeMap
 export function collectSetup({

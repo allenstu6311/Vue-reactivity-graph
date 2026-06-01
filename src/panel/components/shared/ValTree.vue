@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { reactive } from "vue";
 import { formatLeafValue } from "./nodeDisplay";
+import { isArray, isObject } from "@/shared/helper/guards"
 
 const props = defineProps<{
   value: unknown;
@@ -23,41 +24,8 @@ function toggle(key: string | number): void {
   openMap[key] = !isOpen(key);
 }
 
-// 型別判斷邏輯（必須照順序，否則 [Circular] 會被 primitive 分支吃掉）
-function isCircular(): boolean {
-  return props.value === "[Circular]";
-}
-
-function isNull(): boolean {
-  return props.value === null;
-}
-
-function isUndefined(): boolean {
-  return props.value === undefined;
-}
-
-function isPrimitive(): boolean {
-  return typeof props.value !== "object";
-}
-
-function isArray(): boolean {
-  return Array.isArray(props.value);
-}
-
-function isObject(): boolean {
-  return typeof props.value === "object";
-}
-
-function isString(): boolean {
-  return typeof props.value === "string";
-}
-
-function isBoolean(): boolean {
-  return typeof props.value === "boolean";
-}
-
 function getKeys(): (string | number)[] {
-  if (isArray()) {
+  if (isArray(props.value)) {
     return Array.from(
       { length: (props.value as Array<unknown>).length },
       (_, i) => i,
@@ -91,7 +59,7 @@ const isPrimitiveVal = (key: string | number): boolean => {
           ▶
         </button>
         <span>{{ key }}:</span>
-        <span v-if="isObject() && !isPrimitiveVal(key)" style="color: #cdd9ee">Object</span>
+        <span v-if="isObject(props.value) && !isPrimitiveVal(key)" style="color: #cdd9ee">Object</span>
         <span v-else>{{ formatLeafValue(getVal(key)) }}</span>
       </div>
 

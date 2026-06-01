@@ -13,7 +13,7 @@ import { collectProps } from "./collect/props";
 import { collectInject } from "./collect/inject";
 import { collectSetup, collectPiniaState } from "./collect/setup";
 import { collectWatch } from "./collect/watch";
-import { isObject } from "./helper/guards";
+import { isObject } from "@/shared/helper/guards";
 
 // Phase 1: 蒐集所有節點，不觸發任何訂閱者
 export function collectInstance({
