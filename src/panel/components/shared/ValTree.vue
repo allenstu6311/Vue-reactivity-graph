@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { reactive } from "vue";
+import { formatLeafValue } from "./nodeDisplay";
 
 const props = defineProps<{
   value: unknown;
@@ -91,7 +92,7 @@ const isPrimitiveVal = (key: string | number): boolean => {
         </button>
         <span>{{ key }}:</span>
         <span v-if="isObject() && !isPrimitiveVal(key)" style="color: #cdd9ee">Object</span>
-        <span v-else>{{ getVal(key) }}</span>
+        <span v-else>{{ formatLeafValue(getVal(key)) }}</span>
       </div>
 
       <!-- 子層 ValTree：每個 key 各自依 isOpen(key) 展開 -->

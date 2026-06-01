@@ -126,3 +126,45 @@ describe('snapshot（純值與物件）', () => {
     expect(snapshot(obj)).toStrictEqual({ a: 1, self: '[Circular]' })
   })
 })
+
+// ── describe: snapshot 對 null / undefined 節點值 ────────────────────────────
+// 確認「值為 null / undefined」在各層的行為：
+//   1) snapshot 本身：null / undefined 原樣保留，不會被吃掉
+//   2) panel 的 useGraphFetcher 走 JSON.stringify → JSON.parse round-trip：
+//      null 存活，但 undefined 會被整個 key 丟掉（panel 端讀到 undefined）
+describe('snapshot：null / undefined 節點值', () => {
+  it('computed getter 回傳 undefined → snapshot 回傳 undefined', () => {
+    expect(snapshot(computed(() => undefined))).toBeUndefined()
+  })
+
+  it('ref 包裝 undefined → snapshot 回傳 undefined', () => {
+    expect(snapshot(ref(undefined))).toBeUndefined()
+  })
+
+  it('物件含 null / undefined 值 → 各自原樣保留', () => {
+    expect(snapshot({ a: null, b: undefined, c: 1 })).toStrictEqual({
+      a: null,
+      b: undefined,
+      c: 1,
+    })
+  })
+
+  it('陣列含 null / undefined → 保留位置', () => {
+    expect(snapshot([null, undefined, 1])).toStrictEqual([null, undefined, 1])
+  })
+
+  // 關鍵 round-trip：模擬 panel useGraphFetcher 的 JSON.stringify → JSON.parse
+  it('round-trip：val 為 null 時存活', () => {
+    const node = { id: '0.x', val: snapshot(computed(() => null)) }
+    const parsed = JSON.parse(JSON.stringify(node))
+    expect(parsed.val).toBeNull()
+    expect('val' in parsed).toBe(true)
+  })
+
+  it('round-trip：val 為 undefined 時整個 key 被丟掉（panel 端讀到 undefined）', () => {
+    const node = { id: '0.x', val: snapshot(computed(() => undefined)) }
+    const parsed = JSON.parse(JSON.stringify(node))
+    expect(parsed.val).toBeUndefined()
+    expect('val' in parsed).toBe(false) // ← key 消失，並非顯式 null
+  })
+})

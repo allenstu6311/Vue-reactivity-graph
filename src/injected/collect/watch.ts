@@ -12,7 +12,7 @@ export function collectWatch(params: CollectWatchParams): void {
       uid,
       name,
       path,
-      varName: `w_${index}`,
+      varName: `watch`,
       type: "watch",
       val: null,
       filePath,
