@@ -251,6 +251,8 @@ describe('Phase 4 — Provide / Inject', () => {
   it('inject 被 watch 讀取：w_0.deps 包含 inject node id', () => {
     const graph = runWalker(WatchProvider)
     const get = (path: string, varName: string) => getComponentNodes(graph, path).find(n => n.varName === varName)!
+    // watch 節點 varName 統一為 'watch'，改用 id 查找
+    const getById = (path: string, idSuffix: string) => getComponentNodes(graph, path).find(n => n.id === makeId(graph, path, idSuffix))!
 
     const watchConsumerCount = get('WatchProvider.WatchConsumer', 'count')
     expect(pick(watchConsumerCount)).toStrictEqual({
@@ -261,10 +263,10 @@ describe('Phase 4 — Provide / Inject', () => {
       subs: [makeId(graph, 'WatchProvider.WatchConsumer', 'w_0')],
     })
 
-    const watchConsumerW0 = get('WatchProvider.WatchConsumer', 'w_0')
+    const watchConsumerW0 = getById('WatchProvider.WatchConsumer', 'w_0')
     expect(pick(watchConsumerW0)).toStrictEqual({
       id: makeId(graph, 'WatchProvider.WatchConsumer', 'w_0'),
-      varName: 'w_0',
+      varName: 'watch',
       type: 'watch',
       deps: [makeId(graph, 'WatchProvider.WatchConsumer', 'count')],
       subs: [],

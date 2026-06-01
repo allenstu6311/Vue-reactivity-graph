@@ -53,6 +53,8 @@ describe('Phase 2 — Pinia Store 追蹤', () => {
     expect(storeNodes).toHaveLength(3)
 
     const getComp = (varName: string) => compNodes.find(n => n.varName === varName)!
+    // watch 節點 varName 統一為 'watch'，改用 id 查找
+    const getCompById = (idSuffix: string) => compNodes.find(n => n.id === makeId(graph, 'TestComp', idSuffix))!
 
     // storeToRefs ref wrapper：count
     // ref 透過 auto-unwrap 觸發兩次 onTrack，storeValToComponentNode 正確攔截
@@ -113,9 +115,9 @@ describe('Phase 2 — Pinia Store 追蹤', () => {
     })
 
     // watch：w_0（監聽 storeToRefs ref）
-    expect(pick(getComp('w_0'))).toStrictEqual({
+    expect(pick(getCompById('w_0'))).toStrictEqual({
       id: makeId(graph, 'TestComp', 'w_0'),
-      varName: 'w_0',
+      varName: 'watch',
       type: 'watch',
       deps: [makeId(graph, 'TestComp', 'count')],
       subs: [],

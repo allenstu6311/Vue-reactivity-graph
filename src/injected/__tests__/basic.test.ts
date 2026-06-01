@@ -39,6 +39,8 @@ describe('Phase 1 — 單一元件基礎驗證', () => {
     expect(nodes).toHaveLength(7)
 
     const get = (varName: string) => nodes.find(n => n.varName === varName)!
+    // watch 節點 varName 統一為 'watch'，無法用 varName 區分，改用 id 查找
+    const getById = (idSuffix: string) => nodes.find(n => n.id === makeId(graph, 'TestComp', idSuffix))!
 
     // ref: count
     expect(pick(get('count'))).toStrictEqual({
@@ -86,18 +88,18 @@ describe('Phase 1 — 單一元件基礎驗證', () => {
     })
 
     // watch: w_0（監聽 ref）
-    expect(pick(get('w_0'))).toStrictEqual({
+    expect(pick(getById('w_0'))).toStrictEqual({
       id: makeId(graph, 'TestComp', 'w_0'),
-      varName: 'w_0',
+      varName: 'watch',
       type: 'watch',
       deps: [makeId(graph, 'TestComp', 'count')],
       subs: [],
     })
 
     // watch: w_1（監聽 computed）
-    expect(pick(get('w_1'))).toStrictEqual({
+    expect(pick(getById('w_1'))).toStrictEqual({
       id: makeId(graph, 'TestComp', 'w_1'),
-      varName: 'w_1',
+      varName: 'watch',
       type: 'watch',
       deps: [makeId(graph, 'TestComp', 'double')],
       subs: [],
