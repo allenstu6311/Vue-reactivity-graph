@@ -1,3 +1,3 @@
 <template>
-  <div>Vue Reactivity Tracker</div>
+  <div>Vue Reactivity Graph</div>
 </template>

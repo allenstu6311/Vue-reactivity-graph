@@ -1,5 +1,5 @@
 {
-  "name": "vue-reactivity-tracker",
+  "name": "vue-reactivity-graph",
   "private": true,
   "version": "1.0.0",
   "type": "module",

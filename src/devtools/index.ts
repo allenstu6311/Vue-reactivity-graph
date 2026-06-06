@@ -1,5 +1,5 @@
 chrome.devtools.panels.create(
-  'Vue Reactivity',
+  'Vue Reactivity Graph',
   '',
   'panel.html',
 )
