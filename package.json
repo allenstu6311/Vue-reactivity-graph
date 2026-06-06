@@ -2,6 +2,7 @@
   "name": "vue-reactivity-graph",
   "private": true,
   "version": "1.0.0",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "concurrently \"vite build --watch --config vite.injected.config.ts\" \"vite build --watch --config vite.extension.config.ts\"",

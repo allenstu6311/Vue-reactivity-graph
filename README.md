@@ -143,4 +143,4 @@ For the agent-driven development workflow and internal engineering notes, see [C
 
 ## License
 
-> **TODO:** choose a license.
+[MIT](./LICENSE) © Allen

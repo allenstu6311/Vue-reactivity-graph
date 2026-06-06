@@ -143,4 +143,4 @@ pnpm vitest run src/injected/__tests__/props.test.ts
 
 ## 授權
 
-> **TODO：** 選擇授權條款。
+[MIT](./LICENSE) © Allen
