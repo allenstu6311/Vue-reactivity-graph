@@ -65,7 +65,7 @@ render 函數透過兩條路存取 setupState：
 
 **關鍵前提**：`toRaw(reactive({ text: num })).text === num`（RefImpl 本身），`rawSetupState` 也直接儲存 RefImpl，兩者是同一個物件引用，反查可命中。
 
-找不到來源時 `console.warn` 並靜默跳過（例如 `someObj` 內含 primitive value）。
+找不到來源時靜默跳過（已知限制，不噴 warn）。來源若為 ref/computed，整個 Branch A 展開靜默跳過，prop node 不建立 dep 連結。
 
 ---
 

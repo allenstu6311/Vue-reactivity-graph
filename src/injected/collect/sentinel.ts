@@ -49,17 +49,16 @@ function traverseVNodeForSentinels(
         }
 
         const sourceVal = (rawSetupState as any)[sourceKey];
-        const rawSourceObj = (sourceVal?.__v_raw ?? sourceVal) as Record<string, unknown> | null;
-        if (isObject(rawSourceObj)) {
-          for (const innerKey of Object.keys(rawSourceObj)) {
-            const innerVal = rawSourceObj[innerKey];
-            const sourceVarName = reverseMap.get(innerVal);
-            if (sourceVarName !== undefined) {
-              propMap.set(innerKey, sourceVarName);
-            } else {
-              console.warn(
-                `v-bind展開追蹤：無法在 rawSetupState 中找到 "${sourceKey}.${innerKey}" 的來源變數，該 prop 將不會被追蹤。`,
-              );
+        // 若 sourceVal 是 ref/computed，跳過整個 Branch A 展開
+        if (!(sourceVal as any)?.__v_isRef) {
+          const rawSourceObj = (sourceVal?.__v_raw ?? sourceVal) as Record<string, unknown> | null;
+          if (isObject(rawSourceObj)) {
+            for (const innerKey of Object.keys(rawSourceObj)) {
+              const innerVal = rawSourceObj[innerKey];
+              const sourceVarName = reverseMap.get(innerVal);
+              if (sourceVarName !== undefined) {
+                propMap.set(innerKey, sourceVarName);
+              }
             }
           }
         }

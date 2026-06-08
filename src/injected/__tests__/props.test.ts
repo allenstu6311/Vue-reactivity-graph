@@ -321,13 +321,60 @@ describe('Phase 3 — Props 基礎傳遞', () => {
       },
     })
 
-    it('someObj 內含 primitive value：呼叫 console.warn，不拋出例外', () => {
+    it('someObj 內含 primitive value：不拋出例外，且 prop node 無來源連結（deps 為空）', () => {
+      expect(() => runWalker(VBindParentPrimitive)).not.toThrow()
+      const graph = runWalker(VBindParentPrimitive)
+      const child = getComponentNodes(graph, 'VBindParentPrimitive.VBindChildPrimitive')
+
+      expect(child).toBeDefined()
+      const countProp = child.find(n => n.varName === 'count')!
+      expect(countProp).toBeDefined()
+      expect(countProp.deps).toEqual([])
+    })
+
+    // v-bind 來源為 computed 情境
+    // priceAttrs = computed(() => ({ amount: someRef.value, stock: anotherRef.value }))
+    // render 用 createVNode(Child, priceAttrs)，dry-run 時 vnode.props 成為 sentinel Symbol
+    // Branch A guard 應跳過 computed，不列舉內部欄位，不建立追蹤連結
+    const VBindChildComputed = defineComponent({
+      name: 'VBindChildComputed',
+      props: { amount: Number, stock: Number },
+      render() { return h('div') },
+    })
+
+    const VBindParentComputed = defineComponent({
+      name: 'VBindParentComputed',
+      setup() {
+        const someRef = ref(100)
+        const anotherRef = ref(50)
+        const priceAttrs = computed(() => ({ amount: someRef.value, stock: anotherRef.value }))
+        return { someRef, anotherRef, priceAttrs }
+      },
+      render() {
+        return createVNode(VBindChildComputed, (this as any).priceAttrs)
+      },
+    })
+
+    it('v-bind 來源為 computed：不拋出例外，console.warn 未被呼叫，prop node 無追蹤連結或不建立', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       try {
-        expect(() => runWalker(VBindParentPrimitive)).not.toThrow()
-        expect(warnSpy).toHaveBeenCalled()
+        expect(() => runWalker(VBindParentComputed)).not.toThrow()
+        expect(warnSpy).not.toHaveBeenCalled()
       } finally {
         warnSpy.mockRestore()
+      }
+
+      const graph = runWalker(VBindParentComputed)
+      const child = getComponentNodes(graph, 'VBindParentComputed.VBindChildComputed')
+
+      // guard 跳過後 instanceChildPropKeyMap 不記錄該子元件，prop node 是否建立由 collectProps 決定
+      // 斷言涵蓋兩種情況：prop node 為 undefined，或其 deps 為空陣列
+      if (child !== undefined) {
+        const amountProp = child.find(n => n.varName === 'amount')
+        const stockProp = child.find(n => n.varName === 'stock')
+        // 如果 prop node 存在，其 deps 應為空（因為 Branch A 跳過了）
+        if (amountProp) expect(amountProp.deps).toEqual([])
+        if (stockProp) expect(stockProp.deps).toEqual([])
       }
     })
 
