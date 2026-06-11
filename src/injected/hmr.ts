@@ -26,6 +26,7 @@ export function setupHmrHook(
   hook: any,
   originalEmit: Function,
   onHmrScan: (vueApp: { _instance: any }, hmrId: string, instance: any) => void,
+  onComponentAdded?: (instance: any) => void,
 ): void {
   hook.emit = function (event: string, ...args: unknown[]) {
     if (
@@ -38,6 +39,10 @@ export function setupHmrHook(
         pendingHmrIds.delete(hmrId);
         onHmrScan(vueApp, hmrId, instance);
       }
+    } else if (event === "component:added" && onComponentAdded) {
+      // 非 HMR 的新 component mount（如導航後 RouterView 子樹）→ 交給增量收集
+      const [, , , instance] = args as HookComponentEventArgs;
+      if (instance) onComponentAdded(instance);
     }
     return originalEmit(event, ...args);
   };

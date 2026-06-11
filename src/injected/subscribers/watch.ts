@@ -18,6 +18,7 @@ export function bindWatchTrack({
     const watchNode = watchNodes[index]
     if (!watchNode) return
 
+    // 掛 onTrack → effect.run() 觸發求值（deps 在此同步捕捉完）→ 立刻拆掉，避免 handler 常駐燒 CPU
     effect.onTrack = createOnTrackHandler(watchNode, watchNode.id, {
       rawSetupState,
       valNodeMap,
@@ -26,5 +27,6 @@ export function bindWatchTrack({
       storeValToComponentNode,
     }) as any
     effect.run()
+    // effect.onTrack = undefined as any
   })
 }

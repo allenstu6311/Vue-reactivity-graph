@@ -60,6 +60,23 @@ export function detectNodeType(val: ReactiveTarget): NodeType | null {
 
 export const isStoreNode = (node: GraphNode): boolean => node.type === "store";
 
+// 不可序列化 / 不該深爬的值：Vue component instance、公開 proxy、VNode、DOM、function。
+// 對這些做 Object.entries 會
+// (1) 觸發 Vue「enumerating keys on a component instance」警告
+// (2) 順著 parent/subTree/vnode/appContext 爬進整張 Vue 內部物件圖 → stack overflow。
+function snapshotTag(raw: unknown): string | null {
+  if (typeof raw === "function") return "[Function]"
+  if (!isObject(raw)) return null
+  const o = raw as Record<string, unknown>
+  if (o.__v_isVNode === true) return "[VNode]"
+  if (typeof (o as { nodeType?: unknown }).nodeType === "number") return "[DOM]"
+  // 內部 component instance
+  if (typeof o.uid === "number" && "subTree" in o) return "[VueComponent]"
+  // 公開 instance proxy（'in' 走 has trap，不觸發 ownKeys 警告）
+  if ("$el" in o && "$parent" in o) return "[VueComponent]"
+  return null
+}
+
 export function snapshot(val: unknown, seen = new WeakSet<object>()): unknown {
   // 兩種包裝都要剝：
   // - unref 把 ref/computed 變成裡面的值（避免遞迴進 Vue 內部結構）
@@ -67,6 +84,10 @@ export function snapshot(val: unknown, seen = new WeakSet<object>()): unknown {
   const raw = toRaw(unref(val))
 
   if (!isObject(raw)) return raw
+
+  // 偵測到 Vue instance / VNode / DOM / function → 不遞迴，回傳標記
+  const tag = snapshotTag(raw)
+  if (tag) return tag
   if (seen.has(raw)) return '[Circular]'
   seen.add(raw)
 
