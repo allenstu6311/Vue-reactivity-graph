@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **插件名稱**：Vue Reactivity Graph
 
 本專案是一個瀏覽器 DevTools 插件，專為 Vue 3 開發環境設計。
-透過讀取 Vue 3 (v3.5.24)的響應式系統內部狀態，視覺化呈現 `ref` / `reactive` 與 `computed` / `watch` 之間的依賴關係，幫助開發者快速理解與 debug 響應式資料流。
+透過讀取 Vue 3 (`^3.5.13`)的響應式系統內部狀態，視覺化呈現 `ref` / `reactive` 與 `computed` / `watch` 之間的依賴關係，幫助開發者快速理解與 debug 響應式資料流。
 
 **目標使用者**：Vue 3 前端開發者（僅限 dev mode）
 **核心功能**：
@@ -45,6 +45,19 @@ pnpm vitest run src/injected/__tests__/props.test.ts
 ```
 
 載入插件：瀏覽器開啟 `chrome://extensions/`，以「載入未封裝擴充功能」指向 `dist/` 資料夾。
+
+### 建置架構（重要）
+
+`dev` / `build` 都會跑**兩個獨立的 Vite build**，兩者都輸出到同一個 `dist/`：
+
+| Config | 入口 | 產物 |
+|---|---|---|
+| `vite.injected.config.ts` | `injected` / `content` / `background` | `[name].js`（頁面注入與擴充背景腳本，無 HTML） |
+| `vite.extension.config.ts` | `popup.html` / `panel.html` / `devtools.html` | HTML + `chunks/` + assets，含 `public/`（DevTools / popup UI） |
+
+兩個 config 都設 `emptyOutDir: false`——這是刻意的：彼此都寫入同一個 `dist/`，若任一方清空就會覆蓋對方的產物（見 commit `不要覆蓋dist內容`）。新增入口時改對應 config 的 `rollupOptions.input`，**不要**把兩組合併。
+
+`vite.config.ts` **只供 vitest 使用**（`test.environment: 'node'`、`include` 限定 `src/injected/__tests__`），不參與建置。三個 config 共用 `vite.alias.ts` 的路徑別名。
 
 ---
 
@@ -111,19 +124,23 @@ GraphData {
 | `injected/subscribers/watch.ts` | `bindWatchTrack`（Phase 2 watch onTrack 綁定） |
 | `graph/types.ts` | 純型別：NodeType, GraphNode, ComponentMeta, GraphData |
 | `graph/index.ts` | graph 全域狀態 + getGraphData / updateComponent / updateNodes / updateStore / clearGraph |
-| `types/vue-internals.d.ts` | Vue 未公開內部型別（ComputedRefImpl, ExtendedComponentInstance 等） |
+| `types/vue-internals.ts` | Vue 未公開內部型別（ComputedRefImpl, ExtendedComponentInstance 等） |
+| `shared/helper/guards.ts` | 共用 type guard：`isObject`、`isArray`、`isString`、`isSymbol` 等 |
 | `content/index.ts` | 注入 injected.js 到頁面，轉發 postMessage 給 background |
 | `background/index.ts` | 管理 devtools port，廣播 VUE_GRAPH_UPDATE |
 | `devtools/index.ts` | 建立 DevTools panel（panel.html） |
+| `popup/main.ts` | 擴充 popup（popup.html）入口 |
 | `panel/App.vue` | 根元件：接收更新，管理選取狀態 |
 | `panel/composables/useGraphFetcher.ts` | 封裝 `chrome.devtools.inspectedWindow.eval` 與 graph 反序列化 |
 | `panel/composables/useDevtoolsConnection.ts` | 封裝 port 連線、`onMessage`、`onNavigated` 監聽與清理 |
 | `panel/composables/useLayout.ts` | dagre 佈局 + upstream/downstream BFS 展開 |
+| `panel/composables/useLeftWidth.ts` | 左側面板寬度拖曳調整 |
 | `panel/components/GraphView.vue` | vue-flow 渲染節點與邊 |
 | `panel/components/GraphNode.vue` | 單一節點外觀 |
 | `panel/components/VariableList.vue` | 左側變數清單 |
 | `panel/components/shared/nodeDisplay.ts` | `getDisplayName` 共用函數 |
 | `panel/nodeTypeMeta.ts` | 各節點類型的顏色、標籤設定 |
+| `panel/tabs.ts` / `panel/utils.ts` | panel 分頁定義與輔助函數 |
 
 ---
 
