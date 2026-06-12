@@ -97,9 +97,9 @@ export function snapshot(
   // 偵測到 Vue instance / VNode / DOM / function → 不遞迴，回傳標記
   const tag = snapshotTag(raw)
   if (tag) return tag
-  if (depth >= SNAPSHOT_MAX_DEPTH) {
-    return '[MaxDepth]'
-  }
+
+  // 觸及深度上限 / 偵測到環 → 停止遞迴，回傳標記
+  if (depth >= SNAPSHOT_MAX_DEPTH) return '[MaxDepth]'
   if (seen.has(raw)) return '[Circular]'
   seen.add(raw)
 
