@@ -77,7 +77,16 @@ function snapshotTag(raw: unknown): string | null {
   return null
 }
 
-export function snapshot(val: unknown, seen = new WeakSet<object>()): unknown {
+// 深度上限：seen 只能擋「同一個物件再次出現」的環，擋不住
+// (1) 深但無環的巨大結構，(2) getter 每次回傳新物件（seen 永遠不命中）→ 無限深。
+// 這兩種都會讓 snapshot 遞迴到爆 stack（實測於交易頁），故額外設硬上限。
+const SNAPSHOT_MAX_DEPTH = 20
+
+export function snapshot(
+  val: unknown,
+  seen = new WeakSet<object>(),
+  depth = 0,
+): unknown {
   // 兩種包裝都要剝：
   // - unref 把 ref/computed 變成裡面的值（避免遞迴進 Vue 內部結構）
   // - toRaw 把 reactive proxy 變成 raw target（避免觸發 proxy get trap / track）
@@ -88,17 +97,20 @@ export function snapshot(val: unknown, seen = new WeakSet<object>()): unknown {
   // 偵測到 Vue instance / VNode / DOM / function → 不遞迴，回傳標記
   const tag = snapshotTag(raw)
   if (tag) return tag
+  if (depth >= SNAPSHOT_MAX_DEPTH) {
+    return '[MaxDepth]'
+  }
   if (seen.has(raw)) return '[Circular]'
   seen.add(raw)
 
   if (Array.isArray(raw)) {
-    return raw.map(item => snapshot(item, seen))
+    return raw.map(item => snapshot(item, seen, depth + 1))
   }
 
   const out: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(raw)) {
     if (key.startsWith('__v_')) continue
-    out[key] = snapshot(value, seen)
+    out[key] = snapshot(value, seen, depth + 1)
   }
   return out
 }
