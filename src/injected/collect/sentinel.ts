@@ -1,6 +1,12 @@
 import type { RawAppContext, SentinelVNode } from "../../types/vue-internals";
 import type { SentinelDryRunParams } from "./types";
-import { isObject, isString, isSymbol, isFunction } from "@/shared/helper/guards";
+import {
+  isObject,
+  isString,
+  isSymbol,
+  isFunction,
+} from "@/shared/helper/guards";
+import { getRaw, unref } from "../helper/nodes";
 
 function resolveGlobalComponent(
   appContext: RawAppContext | null | undefined,
@@ -10,7 +16,9 @@ function resolveGlobalComponent(
   if (!components) return undefined;
   const camel = name.replace(/-(\w)/g, (_, c: string) => c.toUpperCase());
   const pascal = camel.charAt(0).toUpperCase() + camel.slice(1);
-  return (components[name] ?? components[camel] ?? components[pascal]) as object | undefined;
+  return (components[name] ?? components[camel] ?? components[pascal]) as
+    | object
+    | undefined;
 }
 
 function traverseVNodeForSentinels(
@@ -44,21 +52,27 @@ function traverseVNodeForSentinels(
         const sourceKey = sentinelToKey.get(vnode.props)!;
 
         const reverseMap = new Map<unknown, string>();
-        for (const [k, v] of Object.entries(rawSetupState as Record<string, unknown>)) {
+        for (const [k, v] of Object.entries(
+          rawSetupState as Record<string, unknown>,
+        )) {
           if (k !== sourceKey) reverseMap.set(v, k);
         }
 
         const sourceVal = (rawSetupState as any)[sourceKey];
-        // 若 sourceVal 是 ref/computed，跳過整個 Branch A 展開
-        if (!(sourceVal as any)?.__v_isRef) {
-          const rawSourceObj = (sourceVal?.__v_raw ?? sourceVal) as Record<string, unknown> | null;
-          if (isObject(rawSourceObj)) {
-            for (const innerKey of Object.keys(rawSourceObj)) {
-              const innerVal = rawSourceObj[innerKey];
-              const sourceVarName = reverseMap.get(innerVal);
-              if (sourceVarName !== undefined) {
-                propMap.set(innerKey, sourceVarName);
-              }
+        // 取要展開的物件:unref 分別處理 ref（讀 ._value,不觸發 reactivity）
+        // 與 computed（讀 .value,觸發 getter）;再用 getRaw 剝 __v_raw 拿到 raw target,
+        // 才能用 identity 反查 reverseMap。
+        const rawSourceObj = getRaw(unref(sourceVal)) as Record<
+          string,
+          unknown
+        > | null;
+
+        if (isObject(rawSourceObj)) {
+          for (const innerKey of Object.keys(rawSourceObj)) {
+            const innerVal = rawSourceObj[innerKey];
+            const sourceVarName = reverseMap.get(innerVal);
+            if (sourceVarName !== undefined) {
+              propMap.set(innerKey, sourceVarName);
             }
           }
         }
@@ -125,7 +139,7 @@ function traverseVNodeForSentinels(
 // 必須完整保留 save → replace → finally-restore 模式：
 //   const savedSetupState = instance.setupState
 //   const savedProps = instance.props
-//   instance.setupState = sentinelProxy as any
+//   instance.setupState = sentinelSetupProxy as any
 //   instance.props = sentinelPropsProxy as any
 //   try { dryRunVNode = instance.render!.call(...) }
 //   catch { /* ignore */ } finally {
@@ -136,7 +150,10 @@ function traverseVNodeForSentinels(
 export function runSentinelDryRun(params: SentinelDryRunParams): void {
   const { instance, rawSetupState, propsOptions, ctx } = params;
 
-  if (!instance.render || (Object.keys(rawSetupState).length === 0 && !propsOptions)) {
+  if (
+    !instance.render ||
+    (Object.keys(rawSetupState).length === 0 && !propsOptions)
+  ) {
     return;
   }
 
@@ -146,11 +163,7 @@ export function runSentinelDryRun(params: SentinelDryRunParams): void {
   const sentinelPropsProxy = propsOptions
     ? new Proxy(instance.props as object, {
         get(target, key, receiver) {
-          if (
-            isString(key) &&
-            !key.startsWith("__v_") &&
-            key in propsOptions
-          ) {
+          if (isString(key) && !key.startsWith("__v_") && key in propsOptions) {
             const s = Symbol(`props.${key}`);
             sentinelToKey.set(s, `props.${key}`);
             return s;
@@ -160,23 +173,26 @@ export function runSentinelDryRun(params: SentinelDryRunParams): void {
       })
     : instance.props;
 
-  const sentinelProxy = new Proxy((instance.setupState ?? {}) as Record<string, any>, {
-    get(target, key, receiver) {
-      if (isString(key) && !key.startsWith("__v_")) {
-        if (key === "props" && instance.props) return sentinelPropsProxy;
-        const s = Symbol(key);
-        sentinelToKey.set(s, key);
-        return s;
-      }
-      return Reflect.get(target, key, receiver);
+  const sentinelSetupProxy = new Proxy(
+    (instance.setupState ?? {}) as Record<string, any>,
+    {
+      get(target, key, receiver) {
+        if (isString(key) && !key.startsWith("__v_")) {
+          if (key === "props" && instance.props) return sentinelPropsProxy;
+          const s = Symbol(key);
+          sentinelToKey.set(s, key);
+          return s;
+        }
+        return Reflect.get(target, key, receiver);
+      },
     },
-  });
+  );
 
   const savedProps = instance.props;
   instance.props = sentinelPropsProxy as any;
 
   const savedSetupState = instance.setupState;
-  instance.setupState = sentinelProxy as any;
+  instance.setupState = sentinelSetupProxy as any;
   let dryRunVNode: any = null;
 
   const origWarn = console.warn;
@@ -187,7 +203,7 @@ export function runSentinelDryRun(params: SentinelDryRunParams): void {
       proxyToUse!,
       instance.renderCache ?? [],
       instance.props,
-      sentinelProxy,
+      sentinelSetupProxy,
       instance.data ?? {},
       instance.ctx ?? {},
     );

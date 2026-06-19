@@ -59,13 +59,19 @@ render 函數透過兩條路存取 setupState：
 
 1. 偵測到 `typeof vnode.props === 'symbol' && sentinelToKey.has(vnode.props)` → `sourceKey = 'someObj'`
 2. 建立反查表：遍歷 `rawSetupState`（排除 `sourceKey` 自身），`value → varName`
-3. `rawSourceObj = sourceVal.__v_raw ?? sourceVal`（繞過 reactive proxy 取底層 plain object）
+3. `rawSourceObj = getRaw(unref(sourceVal))` 取得要展開的物件：
+   - `unref`（複用自 `helper/nodes.ts`）先把來源解包成裡面的物件——plain ref 讀 `._value`（不觸發 reactivity）、computed 讀 `.value`（觸發 getter），純物件則原樣回傳
+   - `getRaw` 再剝一層 `__v_raw`，繞過 reactive proxy 取底層 plain object
 4. 對每個 `innerKey`：`reverseMap.get(rawSourceObj[innerKey])` 取得 `sourceVarName`
 5. `propMap.set(innerKey, sourceVarName)`（格式與 Strategy 2 相同，子層解析邏輯零修改）
 
 **關鍵前提**：`toRaw(reactive({ text: num })).text === num`（RefImpl 本身），`rawSetupState` 也直接儲存 RefImpl，兩者是同一個物件引用，反查可命中。
 
-找不到來源時靜默跳過（已知限制，不噴 warn）。來源若為 ref/computed，整個 Branch A 展開靜默跳過，prop node 不建立 dep 連結。
+**來源為 ref / computed**：先 `unref` 解包成裡面的物件再展開內層。
+- `computed(() => ({ test: num }))`：解包後內層 `test` 仍持有 RefImpl `num`，identity 命中 → 建立 `test → num` 連結。
+- `computed(() => ({ amount: someRef.value }))`：解包後內層是 primitive（`100`），不在 `reverseMap` 裡 → 反查不到，靜默跳過。
+
+找不到來源時一律靜默跳過（已知限制，不噴 warn、不拋例外）。
 
 ---
 

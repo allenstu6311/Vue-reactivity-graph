@@ -222,7 +222,7 @@ describe('Phase 3 — Props 基礎傳遞', () => {
     // reactive 包裹情境
     // someObj = reactive({ text: num })，<VBindChild v-bind="someObj" />
     // render 模擬：createVNode(Child, (this as any).someObj)
-    // sentinel dry-run 時，(this as any).someObj 存取 sentinelProxy.someObj → Symbol('someObj')
+    // sentinel dry-run 時，(this as any).someObj 存取 sentinelSetupProxy.someObj → Symbol('someObj')
     // createVNode(Child, Symbol) → vnode.props = Symbol('someObj')，觸發 Branch A
     const VBindChildReactive = defineComponent({
       name: 'VBindChildReactive',
@@ -332,10 +332,11 @@ describe('Phase 3 — Props 基礎傳遞', () => {
       expect(countProp.deps).toEqual([])
     })
 
-    // v-bind 來源為 computed 情境
+    // v-bind 來源為 computed，且回傳物件內層是 primitive（.value）情境
     // priceAttrs = computed(() => ({ amount: someRef.value, stock: anotherRef.value }))
     // render 用 createVNode(Child, priceAttrs)，dry-run 時 vnode.props 成為 sentinel Symbol
-    // Branch A guard 應跳過 computed，不列舉內部欄位，不建立追蹤連結
+    // unref(priceAttrs) 取 .value 得到 { amount: 100, stock: 50 }，內層是 primitive，
+    // 不在 reverseMap 裡 → 反查不到 → 不建立連結（不噴 warn、不拋例外）
     const VBindChildComputed = defineComponent({
       name: 'VBindChildComputed',
       props: { amount: Number, stock: Number },
@@ -376,6 +377,49 @@ describe('Phase 3 — Props 基礎傳遞', () => {
         if (amountProp) expect(amountProp.deps).toEqual([])
         if (stockProp) expect(stockProp.deps).toEqual([])
       }
+    })
+
+    // v-bind 來源為 computed，且回傳物件「裝著」兄弟 ref（非 .value）情境
+    // data2 = computed(() => ({ test: num }))，內層 test 直接持有 RefImpl num
+    // unref(data2) 取 .value 得到 { test: num }，內層仍是同一個 RefImpl → reverseMap 可反查
+    // 應建立 test → num 的追蹤連結（這是 .value 展開相對「整個跳過」的增強）
+    const VBindChildComputedRef = defineComponent({
+      name: 'VBindChildComputedRef',
+      props: { test: Number },
+      render() { return h('div') },
+    })
+
+    const VBindParentComputedRef = defineComponent({
+      name: 'VBindParentComputedRef',
+      setup() {
+        const num = ref(1)
+        const data2 = computed(() => ({ test: num }))
+        return { num, data2 }
+      },
+      render() {
+        return createVNode(VBindChildComputedRef, (this as any).data2)
+      },
+    })
+
+    it('v-bind 來源為 computed 且內層持有 ref：prop node 的 deps 包含來源 ref 的 id', () => {
+      const graph = runWalker(VBindParentComputedRef)
+      const child = getComponentNodes(graph, 'VBindParentComputedRef.VBindChildComputedRef')
+
+      expect(child).toBeDefined()
+      const testProp = child.find(n => n.varName === 'test')!
+      expect(testProp).toBeDefined()
+      expect(testProp.deps).toContain(makeId(graph, 'VBindParentComputedRef', 'num'))
+    })
+
+    it('v-bind 來源為 computed 且內層持有 ref：來源 ref 的 subs 包含 prop node 的 id', () => {
+      const graph = runWalker(VBindParentComputedRef)
+      const parent = getComponentNodes(graph, 'VBindParentComputedRef')
+
+      const numNode = parent.find(n => n.varName === 'num')!
+      expect(numNode).toBeDefined()
+      expect(numNode.subs).toContain(
+        makeId(graph, 'VBindParentComputedRef.VBindChildComputedRef', 'test'),
+      )
     })
 
     // Branch A 與 Branch B 並存情境

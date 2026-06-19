@@ -11,7 +11,7 @@ function toRaw<T>(val: T): T {
   return raw ? toRaw(raw) : val;
 }
 
-function unref(val: unknown): unknown {
+export function unref(val: unknown): unknown {
   if (isObject(val) && (val as any).__v_isRef === true) {
     const inner = (val as any).effect
       ? (val as any).value        // computed：強制觸發 getter
