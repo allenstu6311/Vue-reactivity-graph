@@ -157,11 +157,8 @@ GraphData {
 
 **Step 1 — 需求分析**
 
-大型 Feature / 模糊需求 / 需要拆工：
-先使用 `to-prd`，再使用 `to-issues`，最後針對選定 issue 呼叫 `spec-writer` 產出 `spec.md`。
-
-Bugfix / 小型 Refactor / 明確工程修改：
-直接呼叫 `spec-writer` 產出 `spec.md`。
+所有需求（大型 Feature / 模糊需求 / Bugfix / 小型 Refactor / 明確工程修改）皆呼叫 `spec-writer` 產出 `spec.md`。
+需求較大或需要拆工時，由 `spec-writer` 先釐清範圍並拆解，再針對選定範圍產出 `spec.md`。
 
 **Step 2 — 領域審閱**
 `spec-writer` 完成後，根據 spec.md 末尾的「審閱建議」呼叫對應的 Vue 領域代理人，審閱並補充實作細節：
