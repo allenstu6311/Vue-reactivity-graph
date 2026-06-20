@@ -1,4 +1,4 @@
-import type { HookComponentEventArgs, VueAppInternals } from "../types/vue-internals";
+import type { ExtendedComponentInstance } from "../types/vue-internals";
 
 const pendingHmrIds = new Set<string>();
 
@@ -22,23 +22,18 @@ export function patchHmrRuntime(hmr: any): void {
   };
 }
 
-export function setupHmrHook(
-  hook: any,
-  originalEmit: Function,
-  onHmrScan: (vueApp: { _instance: any }, hmrId: string, instance: any) => void,
-): void {
-  hook.emit = function (event: string, ...args: unknown[]) {
-    if (
-      (event === "component:added" || event === "component:updated") &&
-      pendingHmrIds.size > 0
-    ) {
-      const [vueApp, , , instance] = args as HookComponentEventArgs;
-      const hmrId: string | undefined = (instance?.type as any)?.__hmrId;
-      if (hmrId && pendingHmrIds.has(hmrId)) {
-        pendingHmrIds.delete(hmrId);
-        onHmrScan(vueApp, hmrId, instance);
-      }
-    }
-    return originalEmit(event, ...args);
-  };
+/**
+ * 檢查該 instance 是否命中 pending HMR
+ * 命中時回傳 hmrId 並從 pending 移除；未命中回傳 undefined
+ *
+ * @param instance - component instance
+ * @returns hmrId（命中）或 undefined（未命中）
+ */
+export function consumePendingHmrId(instance: ExtendedComponentInstance): string | undefined {
+  const hmrId: string | undefined = (instance?.type as any)?.__hmrId;
+  if (hmrId && pendingHmrIds.has(hmrId)) {
+    pendingHmrIds.delete(hmrId);
+    return hmrId;
+  }
+  return undefined;
 }

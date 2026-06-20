@@ -2,7 +2,8 @@ import {
   runScan,
 } from "./walker";
 import { WalkContext } from "./context/WalkContext";
-import { patchHmrRuntime, setupHmrHook } from "./hmr";
+import { patchHmrRuntime } from "./hmr";
+import { HookChangeSource } from "./HookChangeSource";
 import type { VueAppInternals } from "../types/vue-internals";
 import { getGraphData, setOnUpdate } from "../graph";
 import { snapshot } from "./helper/nodes";
@@ -10,13 +11,11 @@ import { snapshot } from "./helper/nodes";
 const appEl = document.querySelector("#app") as
   | (Element & VueAppInternals)
   | null;
-const app = appEl?.__vue_app__?._instance;
+const getRoot = () => appEl?.__vue_app__?._instance;
+const root = getRoot();
 const hmr = (window as any).__VUE_HMR_RUNTIME__;
 
-const hook = (window as any).__VUE_DEVTOOLS_GLOBAL_HOOK__;
-const originalEmit = hook.emit.bind(hook);
-
-if (app) {
+if (root) {
   const ctx = new WalkContext();
 
   function refreshGraph() {
@@ -40,18 +39,27 @@ if (app) {
     window.postMessage({ type: "VUE_GRAPH_UPDATE" }, "*");
   }
 
-  if (hmr) patchHmrRuntime(hmr);
-  setupHmrHook(hook, originalEmit, (vueApp, hmrId, instance) => {
-    ctx.hmrOverrideMap.set(hmrId, instance);
+  // 更新邏輯：動態讀取 root，nullish 早退，finally 清 override
+  const onChange = () => {
     try {
-      runScan(vueApp._instance, ctx);
+      const cur = getRoot();
+      if (!cur) return;
+      runScan(cur, ctx);
       refreshGraph();
     } finally {
-      ctx.hmrOverrideMap.delete(hmrId);
+      ctx.hmrOverrideMap.clear();
     }
-  });
+  };
+
+  if (hmr) patchHmrRuntime(hmr);
+
+  // 有 hook 才接線來源模組，無 hook 不自建、不 throw
+  const hook = (window as any).__VUE_DEVTOOLS_GLOBAL_HOOK__;
+  if (hook) {
+    new HookChangeSource(hook, ctx).setOnChange(onChange);
+  }
 
   setOnUpdate(refreshGraph);
-  runScan(app, ctx);
+  runScan(root, ctx);
   refreshGraph();
 }
