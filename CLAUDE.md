@@ -98,6 +98,8 @@ GraphData {
 | `injected/context/types.ts` | `InstanceData` 介面 |
 | `injected/helper/nodes.ts` | `createNode`、`detectNodeType`、`setValNode`：GraphNode 建立、型別偵測與寫入 valNodeMap |
 | `injected/helper/resolve.ts` | `resolveDepName`、`resolveDepNode`、`isPiniaStoreProxy`、`isStoreToRefsRef` |
+| `injected/helper/componentName.ts` | `getInstanceName`：組件名稱解析（完整 fallback chain + module-private `classify` / `basename`）；全專案唯一名稱解析來源 |
+| `shared/helper/guards.ts` | 跨模組型別守衛：`isObject`、`isSymbol` 等，被 collect / injected 多檔共用 |
 | `injected/helper/types.ts` | 各函數參數介面：`CollectSetupStateParams`、`ResolveDepNodeParams`、`BindSetupTrackParams`、`BaseCollectParams` |
 | `injected/collect/types.ts` | collect 子模組的參數介面：`CollectPropsParams`、`CollectInjectParams`、`CollectSetupParams`、`CollectWatchParams`、`SentinelDryRunParams` |
 | `injected/collect/sentinel.ts` | `runSentinelDryRun`：sentinel dry-run 邏輯；`traverseVNodeForSentinels`、`resolveGlobalComponent` helper |
@@ -111,7 +113,7 @@ GraphData {
 | `injected/subscribers/watch.ts` | `bindWatchTrack`（Phase 2 watch onTrack 綁定） |
 | `graph/types.ts` | 純型別：NodeType, GraphNode, ComponentMeta, GraphData |
 | `graph/index.ts` | graph 全域狀態 + getGraphData / updateComponent / updateNodes / updateStore / clearGraph |
-| `types/vue-internals.d.ts` | Vue 未公開內部型別（ComputedRefImpl, ExtendedComponentInstance 等） |
+| `types/vue-internals.ts` | Vue 未公開內部型別（ComputedRefImpl, ExtendedComponentInstance 等） |
 | `content/index.ts` | 注入 injected.js 到頁面，轉發 postMessage 給 background |
 | `background/index.ts` | 管理 devtools port，廣播 VUE_GRAPH_UPDATE |
 | `devtools/index.ts` | 建立 DevTools panel（panel.html） |
@@ -122,8 +124,22 @@ GraphData {
 | `panel/components/GraphView.vue` | vue-flow 渲染節點與邊 |
 | `panel/components/GraphNode.vue` | 單一節點外觀 |
 | `panel/components/VariableList.vue` | 左側變數清單 |
+| `panel/components/ComponentTree.vue` | 右側元件樹選擇器（選元件時顯示，TreeItem 為遞迴子項） |
+| `panel/components/NodeDetail.vue` | 左側 Detail 子分頁：單一節點詳情（ValTree 渲染值） |
+| `panel/tabs.ts` | panel 分頁定義：Components / Stores |
 | `panel/components/shared/nodeDisplay.ts` | `getDisplayName` 共用函數 |
 | `panel/nodeTypeMeta.ts` | 各節點類型的顏色、標籤設定 |
+| `popup/App.vue` | 瀏覽器 toolbar popup（目前僅顯示插件名稱）|
+
+---
+
+## Panel UI 結構
+
+panel 不只是 reactivity graph，還有元件樹檢視：
+
+- 左側分 **Components / Stores** 兩個主分頁（`tabs.ts`），各有 **List / Detail** 子分頁
+- 右側兩種模式：未選元件時顯示 **ComponentTree**（元件樹選擇器）；選定後顯示 **GraphView**（依賴關係圖）
+- 另有 `popup/`（瀏覽器 toolbar popup，目前僅顯示插件名稱）
 
 ---
 
