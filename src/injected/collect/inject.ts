@@ -4,6 +4,7 @@ import { getGraphData } from "../../graph";
 import { createNode } from "../helper/nodes";
 import { linkNodes } from "../subscribers/shared";
 import { isObject, isSymbol } from "@/shared/helper/guards";
+import { getInstanceName } from "../helper/componentName";
 
 // DFS 時序契約：anonymous provide node 建立後直接寫入 getGraphData().nodes[parent!.uid.toString()]。
 // 此陣列由父層 updateNodes(parent!.uid.toString(), nodes) 建立——DFS 保證父層 collectInstance
@@ -34,10 +35,7 @@ export function collectInject(params: CollectInjectParams): Set<string> {
     ...Object.getOwnPropertySymbols(parentProvides as object),
   ];
   const parentFilePath = (instance.parent?.type as any)?.__file ?? '';
-  const parentComponentName =
-    (instance.parent?.type as any)?.__name ||
-    (instance.parent?.type as any)?.name ||
-    'Anonymous';
+  const parentComponentName = getInstanceName(instance.parent);
 
   for (const key of provideKeys) {
     const val = parentProvides[key];

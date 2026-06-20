@@ -1,6 +1,7 @@
 import type { GraphNode } from '../../graph/types'
 import type { ExtendedComponentInstance, Data, WatchEffect } from '../../types/vue-internals'
 import type { InstanceData } from './types'
+import { getInstanceName } from '../helper/componentName'
 
 export class WalkContext {
   valNodeMap: WeakMap<object, GraphNode> = new WeakMap()
@@ -44,10 +45,7 @@ export class WalkContext {
 
 export function extractInstanceData(instance: ExtendedComponentInstance): InstanceData {
   const filePath = (instance.type as any).__file ?? ''
-  const name =
-    ((instance.type as any).__name as string) ||
-    ((instance.type as any).name as string) ||
-    'Anonymous'
+  const name = getInstanceName(instance)
 
   const rawSetupState = instance.setupState?.['__v_raw'] || {}
 
