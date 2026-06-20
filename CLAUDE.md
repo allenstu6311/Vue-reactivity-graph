@@ -157,6 +157,8 @@ panel 不只是 reactivity graph，還有元件樹檢視：
 - `DESIGN_NOTES.md`：onTrack 限制、追蹤策略索引（setup-state / props / inject / pinia）、DFS 順序重要性
 - `.claude/skills/coding-guidelines/SKILL.md`：通用開發行為準則（先釐清再動手、最小實作、外科手術式修改、目標驅動）
 
+需查「為什麼這樣決定」（決策紀錄）時，讀 `docs/adr/README.md`（ADR 索引）；該檔與描述「現況怎麼運作」的 DESIGN_NOTES.md / docs/tracking/ 分開維護。
+
 ---
 
 ## Guardrails
