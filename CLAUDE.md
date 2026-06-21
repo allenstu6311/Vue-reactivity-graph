@@ -68,7 +68,7 @@ pnpm vitest run src/injected/__tests__/props.test.ts
 **`GraphNode`**：變數節點，存放於 `GraphData.nodes`，key 為 uid string，值為節點陣列（不含 sentinel）。
 - `id`：`${uid}.${varName}`，全域唯一
 - `type`：`ref` | `reactive` | `computed` | `watch` | `store` | `prop` | `inject`
-- `val`：當前值（序列化前為實際值，序列化後清空為 `''`）
+- `val`：當前值。寫入 `window.__vueReactivityGraph` 前（`injected/index.ts` 的 `refreshGraph`），每個節點的 val 會經 `snapshot()`（`injected/helper/nodes.ts`）處理：剝除 ref/computed/reactive 包裝、過濾 `__v_*` key、遞迴展開物件/陣列、循環引用標記為 `'[Circular]'`；panel 端再經 `JSON.stringify`/`JSON.parse` round-trip
 - `filePath`：來源檔案絕對路徑
 - `name`：所屬 component 名稱
 - `uid`：所屬 component 的 Vue uid（store 節點可選）

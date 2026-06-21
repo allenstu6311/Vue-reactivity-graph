@@ -12,6 +12,7 @@
 | # | 標題 | 狀態 | 日期 |
 |---|---|---|---|
 | [0001](0001-decouple-update-trigger-from-data-source.md) | 組件更新觸發源與更新邏輯解耦 | 採用 | 2026-06-20 |
+| [0002](0002-snapshot-lightweight-defensive-serialization.md) | snapshot 值序列化採輕量防禦，不採 devtools 完整方案 | 採用 | 2026-06-21 |
 
 ## 格式
 
