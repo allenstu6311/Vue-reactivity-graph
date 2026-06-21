@@ -8,14 +8,12 @@ import type { VueAppInternals } from "../types/vue-internals";
 import { getGraphData, setOnUpdate } from "../graph";
 import { snapshot } from "./helper/nodes";
 
-const appEl = document.querySelector("#app") as
-  | (Element & VueAppInternals)
-  | null;
-const getRoot = () => appEl?.__vue_app__?._instance;
-const root = getRoot();
-const hmr = (window as any).__VUE_HMR_RUNTIME__;
+// 每次重查 #app：injected 可能在 app mount 前執行，#app 或 __vue_app__ 都可能尚未就緒
+const getRoot = () =>
+  (document.querySelector("#app") as (Element & VueAppInternals) | null)
+    ?.__vue_app__?._instance;
 
-if (root) {
+function init(root: NonNullable<ReturnType<typeof getRoot>>) {
   const ctx = new WalkContext();
 
   function refreshGraph() {
@@ -51,6 +49,7 @@ if (root) {
     }
   };
 
+  const hmr = (window as any).__VUE_HMR_RUNTIME__;
   if (hmr) patchHmrRuntime(hmr);
 
   // 有 hook 才接線來源模組，無 hook 不自建、不 throw
@@ -62,4 +61,22 @@ if (root) {
   setOnUpdate(refreshGraph);
   runScan(root, ctx);
   refreshGraph();
+}
+
+// 初次啟動：root 就緒就直接 init；否則輪詢等待 app 掛載（每 100ms，最多 ~5s）。
+// 解決 injected 在 app mount 前執行時 root 為 null、整支不啟動的競態。
+const existing = getRoot();
+if (existing) {
+  init(existing);
+} else {
+  let tries = 0;
+  const timer = setInterval(() => {
+    const r = getRoot();
+    if (r) {
+      clearInterval(timer);
+      init(r);
+    } else if (++tries > 50) {
+      clearInterval(timer);
+    }
+  }, 100);
 }
