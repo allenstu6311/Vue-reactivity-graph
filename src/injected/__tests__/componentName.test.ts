@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { defineComponent, h, createRenderer, reactive } from 'vue'
+import { defineComponent, h, createRenderer } from 'vue'
 import type { ComponentInternalInstance } from 'vue'
 import { getInstanceName } from '../helper/componentName'
 
@@ -53,25 +53,22 @@ describe('getInstanceName', () => {
   // ──────────────────────────────────────────────────────────────────────────────
   // Function component: displayName / name
   // ──────────────────────────────────────────────────────────────────────────────
-  it('function 型組件：displayName 優先', () => {
-    const FuncComp = defineComponent(
-      function MyComponent() {
-        return h('div')
-      }
-    )
-    // 手動設定 displayName
-    ;(FuncComp as any).displayName = 'CustomDisplayName'
-    ;(FuncComp as any).name = 'FunctionName'
-
-    const Parent = defineComponent({
-      components: { FuncComp },
-      render() { return h(FuncComp) },
-    })
-    const parentInst = createTestInstance(Parent)
-    const childInst = (parentInst.setupState as any)?.default || findChildInstance(parentInst, FuncComp)
-    if (childInst) {
-      expect(getInstanceName(childInst)).toBe('CustomDisplayName')
+  it('function 型組件：displayName 優先（getComponentTypeName function 分支）', () => {
+    // functional component 不建立 ComponentInternalInstance，無法用掛載取得實例，
+    // 故以最小 instance 直接驗證 function-type 分支：displayName 優先於 name。
+    function MyComponent() {
+      return h('div')
     }
+    ;(MyComponent as any).displayName = 'CustomDisplayName'
+
+    const fakeInstance = {
+      type: MyComponent,
+      root: null,
+      parent: null,
+      appContext: null,
+    } as unknown as ComponentInternalInstance
+
+    expect(getInstanceName(fakeInstance)).toBe('CustomDisplayName')
   })
 
   it('function 型組件：displayName 不存在時用內置 name', () => {
@@ -87,10 +84,9 @@ describe('getInstanceName', () => {
     })
     const parentInst = createTestInstance(Parent)
     const childInst = findChildInstance(parentInst, MyComponent)
-    if (childInst) {
-      // MyComponent 內置 name 為 'MyComponent'
-      expect(getInstanceName(childInst)).toBe('MyComponent')
-    }
+    expect(childInst).toBeDefined()
+    // MyComponent 內置 name 為 'MyComponent'
+    expect(getInstanceName(childInst!)).toBe('MyComponent')
   })
 
   // ──────────────────────────────────────────────────────────────────────────────
@@ -110,9 +106,8 @@ describe('getInstanceName', () => {
     })
     const parentInst = createTestInstance(Parent)
     const childInst = findChildInstance(parentInst, ExplicitNameChild)
-    if (childInst) {
-      expect(getInstanceName(childInst)).toBe('ExplicitName')
-    }
+    expect(childInst).toBeDefined()
+    expect(getInstanceName(childInst!)).toBe('ExplicitName')
   })
 
   it('object 型組件：_componentTag fallback', () => {
@@ -128,9 +123,8 @@ describe('getInstanceName', () => {
     })
     const parentInst = createTestInstance(Parent)
     const childInst = findChildInstance(parentInst, TagChild)
-    if (childInst) {
-      expect(getInstanceName(childInst)).toBe('ComponentTag')
-    }
+    expect(childInst).toBeDefined()
+    expect(getInstanceName(childInst!)).toBe('ComponentTag')
   })
 
   // ──────────────────────────────────────────────────────────────────────────────
@@ -150,10 +144,9 @@ describe('getInstanceName', () => {
     })
     const parentInst = createTestInstance(Parent)
     const childInst = findChildInstance(parentInst, IndexComp)
-    if (childInst) {
-      // 應該 fallback 到 _componentTag
-      expect(getInstanceName(childInst)).toBe('IndexTag')
-    }
+    expect(childInst).toBeDefined()
+    // 應該 fallback 到 _componentTag
+    expect(getInstanceName(childInst!)).toBe('IndexTag')
   })
 
   it('__name === "index" 且 __file 以 index.vue 結尾時，視為空字串往下 fallback', () => {
@@ -169,12 +162,11 @@ describe('getInstanceName', () => {
     })
     const parentInst = createTestInstance(Parent)
     const childInst = findChildInstance(parentInst, IndexComp)
-    if (childInst) {
-      // 應該繼續 fallback，最終用 classify(basename(...))
-      const name = getInstanceName(childInst)
-      expect(name).not.toBe('index')
-      expect(name).not.toBe('Index')
-    }
+    expect(childInst).toBeDefined()
+    // 應該繼續 fallback，最終用 classify(basename(...))
+    const name = getInstanceName(childInst!)
+    expect(name).not.toBe('index')
+    expect(name).not.toBe('Index')
   })
 
   // ──────────────────────────────────────────────────────────────────────────────
@@ -194,9 +186,8 @@ describe('getInstanceName', () => {
 
     const parentInst = createTestInstance(Parent)
     const childInst = findChildInstance(parentInst, LocalChild)
-    if (childInst) {
-      expect(getInstanceName(childInst)).toBe('MyLocalComponent')
-    }
+    expect(childInst).toBeDefined()
+    expect(getInstanceName(childInst!)).toBe('MyLocalComponent')
   })
 
   // ──────────────────────────────────────────────────────────────────────────────
@@ -219,9 +210,8 @@ describe('getInstanceName', () => {
 
     const parentInst = (app as any)._instance as ComponentInternalInstance
     const childInst = findChildInstance(parentInst, GlobalChild)
-    if (childInst) {
-      expect(getInstanceName(childInst)).toBe('MyGlobalComponent')
-    }
+    expect(childInst).toBeDefined()
+    expect(getInstanceName(childInst!)).toBe('MyGlobalComponent')
   })
 
   // ──────────────────────────────────────────────────────────────────────────────
@@ -233,16 +223,15 @@ describe('getInstanceName', () => {
     })
     ;(FileBasedComp as any).__file = '/path/to/user-profile.vue'
 
+    // 不在 components 註冊，避免反查 registration key 搶在 __file fallback 之前命中
     const Parent = defineComponent({
-      components: { FileBasedComp },
       render() { return h(FileBasedComp) },
     })
 
     const parentInst = createTestInstance(Parent)
     const childInst = findChildInstance(parentInst, FileBasedComp)
-    if (childInst) {
-      expect(getInstanceName(childInst)).toBe('UserProfile')
-    }
+    expect(childInst).toBeDefined()
+    expect(getInstanceName(childInst!)).toBe('UserProfile')
   })
 
   it('Windows 路徑：classify(basename(...)) 正確移除磁碟前綴', () => {
@@ -251,16 +240,15 @@ describe('getInstanceName', () => {
     })
     ;(WinComp as any).__file = 'C:\\Users\\dev\\src\\my-component.vue'
 
+    // 不在 components 註冊，確保走到 __file fallback
     const Parent = defineComponent({
-      components: { WinComp },
       render() { return h(WinComp) },
     })
 
     const parentInst = createTestInstance(Parent)
     const childInst = findChildInstance(parentInst, WinComp)
-    if (childInst) {
-      expect(getInstanceName(childInst)).toBe('MyComponent')
-    }
+    expect(childInst).toBeDefined()
+    expect(getInstanceName(childInst!)).toBe('MyComponent')
   })
 
   // ──────────────────────────────────────────────────────────────────────────────
@@ -271,18 +259,16 @@ describe('getInstanceName', () => {
       render() { return h('div') },
     })
 
+    // 不在 components 註冊，確保最終 fallback 到 'Anonymous Component'
     const Parent = defineComponent({
-      components: { AnonymousComp },
       render() { return h(AnonymousComp) },
     })
 
     const parentInst = createTestInstance(Parent)
     const childInst = findChildInstance(parentInst, AnonymousComp)
-    if (childInst) {
-      // 故意不設定任何名稱相關欄位、不註冊全域、不加 __file
-      const name = getInstanceName(childInst)
-      expect(name).toBe('Anonymous Component')
-    }
+    expect(childInst).toBeDefined()
+    // 故意不設定任何名稱相關欄位、不註冊全域、不加 __file
+    expect(getInstanceName(childInst!)).toBe('Anonymous Component')
   })
 
   // ──────────────────────────────────────────────────────────────────────────────
@@ -300,19 +286,18 @@ describe('getInstanceName', () => {
 
     const parentInst = createTestInstance(Parent)
     const childInst = findChildInstance(parentInst, TestComp)
+    expect(childInst).toBeDefined()
 
-    if (childInst) {
-      const typeKeysBefore = Object.keys((childInst.type as any))
-      const keysWithVrg = typeKeysBefore.filter(k => k.startsWith('__vrg_'))
+    const typeKeysBefore = Object.keys((childInst!.type as any))
+    const keysWithVrg = typeKeysBefore.filter(k => k.startsWith('__vrg_'))
 
-      getInstanceName(childInst)
+    getInstanceName(childInst!)
 
-      const typeKeysAfter = Object.keys((childInst.type as any))
-      const keysWithVrgAfter = typeKeysAfter.filter(k => k.startsWith('__vrg_'))
+    const typeKeysAfter = Object.keys((childInst!.type as any))
+    const keysWithVrgAfter = typeKeysAfter.filter(k => k.startsWith('__vrg_'))
 
-      expect(keysWithVrg.length).toBe(keysWithVrgAfter.length)
-      expect(typeKeysBefore.length).toBe(typeKeysAfter.length)
-    }
+    expect(keysWithVrg.length).toBe(keysWithVrgAfter.length)
+    expect(typeKeysBefore.length).toBe(typeKeysAfter.length)
   })
 })
 
@@ -321,24 +306,36 @@ describe('getInstanceName', () => {
 // ══════════════════════════════════════════════════════════════════════════════════
 
 /**
- * 從 parent instance 的子樹中找到指定 component 型態的實例
- * （簡單 DFS）
+ * 從 parent instance 的子樹中找到指定 component 型態的實例（簡單 DFS）。
+ *
+ * 注意：subTree 在「父層 render 直接回傳 h(Child)」時，subTree 本身即為該
+ * component vnode（type === Child、component 為子實例），必須先檢查 subTree
+ * 自身，否則會直接遞迴進子實例內部、永遠找不到目標。
  */
 function findChildInstance(
   instance: ComponentInternalInstance,
   targetType: any
 ): ComponentInternalInstance | undefined {
-  const children = instance.subTree?.children as any[] | undefined
-  if (Array.isArray(children)) {
-    for (const child of children) {
-      if (child?.type === targetType) {
-        return child
+  const st = instance.subTree as any
+  if (!st) return undefined
+
+  // subTree 本身即目標組件
+  if (st.type === targetType && st.component) {
+    return st.component as ComponentInternalInstance
+  }
+
+  // subTree 的 children 陣列中尋找
+  if (Array.isArray(st.children)) {
+    for (const child of st.children) {
+      if (child?.type === targetType && child?.component) {
+        return child.component as ComponentInternalInstance
       }
     }
   }
 
-  if (instance.subTree?.component) {
-    return findChildInstance(instance.subTree.component, targetType)
+  // 遞迴進入已渲染的子組件
+  if (st.component) {
+    return findChildInstance(st.component, targetType)
   }
 
   return undefined
