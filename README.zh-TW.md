@@ -6,7 +6,7 @@
 
 `Vue 3 dev mode` · `tested against Vue 3.5.x` · `Chrome MV3` · `僅限 dev mode` · `TypeScript`
 
-> **TODO：** 此處補上 DevTools 面板的截圖 / GIF。
+![Vue Reactivity Graph DevTools 面板](./docs/panel.png)
 
 ---
 
