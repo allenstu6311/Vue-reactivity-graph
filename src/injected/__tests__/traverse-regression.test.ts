@@ -1,26 +1,12 @@
 // traverseVNode 互斥分支回歸測試
+// 互斥的理由見 walker.ts traverseVNode 的註解。
 //
-// Bug 根因：
-//   舊版 traverseVNode 沒有 else if——走完 if (vnode.component) fn() 後，
-//   繼續檢查 if (Array.isArray(vnode.children))。
-//
-//   當以 array children 形式傳遞子元件時（h(HostComp, null, [h(Child)])），
-//   Vue 會把 array children 直接掛到 HostComp vnode 的 children 屬性上。
-//   HostComp 的 render 若直接回傳該 slot vnode，則 HostComp.subTree === children[0]
-//   （同一個 vnode 物件，且已掛載，.component 非空）。
-//
-//   traverseVNode(HostComp vnode) 的執行路徑：
-//     1. vnode.component 非空 → fn(HostComp)
-//        fn(HostComp) 內部 → traverseVNode(HostComp.subTree) → fn(Child) ← 第一次
-//     2. 舊版繼續：if (Array.isArray(HostComp_vnode.children)) → true！
-//        → children[0] === HostComp.subTree（同一物件）
-//        → children[0].component 非空 → fn(Child) ← 第二次！
-//
-//   第一趟正常建節點並寫入 valNodeMap；
-//   第二趟所有 val 都 valNodeMap.has 命中 → continue → nodes 為空 →
-//   updateNodes 以空陣列覆蓋 → setup 變數節點消失。
-//
-// 修法：改為 else if，確保 component 分支與 children 分支互斥。
+// 觸發條件：用 array 形式把子組件傳進去 —— h(HostComp, null, [h(Child)])。
+// 此時同一個 Child 同時出現在兩個地方：
+//   (1) HostComp「收到的東西」（vnode.children）
+//   (2) HostComp「畫出來的東西」（subTree）—— 因為 HostComp 直接把收到的 Child 原封不動畫出來
+// 是同一個 Child 物件。舊版缺 else if，兩條路都走 → 同一個 Child 被遍歷兩次，
+// 第二趟蒐集到空 nodes 覆蓋掉第一趟 → 節點消失。
 
 import { describe, it, expect } from 'vitest'
 import { defineComponent, ref, computed, h } from 'vue'

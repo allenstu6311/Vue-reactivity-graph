@@ -67,6 +67,16 @@ function traverseVNode(
   fn: InstanceVisitor,
 ): void {
   if (!vnode) return
+  // component 與 children 兩分支必須互斥（少了 else 會重複遍歷）：
+  //
+  // - 碰到 component vnode：它畫出來的內容在 instance.subTree，fn → collectInstance 內部會遞迴
+  //   subTree；傳進去的 slot 內容只要有被畫出來，也已經落在 subTree 裡。所以「畫出來的東西」都由
+  //   subTree 涵蓋了，不需要再看 vnode.children（= 傳進去的 slot 原始 vnode）。若多看這一次，同一個
+  //   子組件會被走兩次（曾導致第二趟蒐集到空 nodes、updateNodes 覆蓋掉第一趟、節點消失）。
+  //
+  // - children 分支是給「不是 component」的 vnode 用的（<div>、fragment、v-for 清單等）：它們沒有
+  //   自己的 subTree，children 就是它們的內容。而 component 畫出來的 subTree 最外層往往就是 <div>
+  //   這類標籤，要找到包在裡面的組件，就得靠這分支遞迴鑽進去——少了它，遍歷會卡在 <div> 出不去。
   if (vnode.component) fn({ rawInstance: vnode.component as ExtendedComponentInstance, parent, ctx })
   else if (Array.isArray(vnode.children)) {
     vnode.children.forEach((child) => {
