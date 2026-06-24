@@ -68,7 +68,7 @@ function traverseVNode(
 ): void {
   if (!vnode) return
   if (vnode.component) fn({ rawInstance: vnode.component as ExtendedComponentInstance, parent, ctx })
-  if (Array.isArray(vnode.children)) {
+  else if (Array.isArray(vnode.children)) {
     vnode.children.forEach((child) => {
       if (isObject(child)) traverseVNode(child as VNode, parent, ctx, fn)
     })
@@ -159,7 +159,6 @@ export function runScan(root: ExtendedComponentInstance, ctx: WalkContext): void
       updateStore(storeId, nodes)
     }
   }
-
   // Phase 1: 建節點
   collectInstance({ rawInstance: root, ctx })
 
