@@ -6,7 +6,7 @@ A Chrome DevTools extension that visualizes the dependency graph between `ref` /
 
 `Vue 3 dev mode` · `tested against Vue 3.5.x` · `Chrome MV3` · `Dev mode only` · `TypeScript`
 
-> **TODO:** add a screenshot / GIF of the DevTools panel here.
+![Vue Reactivity Graph DevTools panel](./docs/panel.png)
 
 ---
 
