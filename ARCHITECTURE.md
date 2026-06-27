@@ -66,11 +66,12 @@ graph TD
     B --> C{有 propsOptions?}
     C -->|是| D[rawPropsObj = instance.props.__v_raw\npropKeyNodeMap.set rawPropsObj, propMap]
     D --> E[每個 propKey → 建 propNode]
-    E --> F{找父層來源}
-    F -->|Strategy 1 同名| G[parentRawSetupState 同名值\n→ valNodeMap.get val]
-    F -->|Strategy 2 異名| H[instanceChildPropKeyMap\n查 sentinel dry-run 結果]
-    G --> I[propNode.deps / parentNode.subs 互連]
-    H --> I
+    E --> F[查父層 dry-run 結果\nctx.instanceChildPropKeyMap.get parent\n→ 得 sourceKey]
+    F --> G{sourceKey 形態}
+    G -->|props.xxx| H1[父層 propKeyNodeMap\npass-through prop]
+    G -->|setup 變數名| H2[parentRawSetupState sourceKey\n→ propSourceInjectMap ?? valNodeMap]
+    H1 --> I[linkNodes 連接 parentNode 與 propNode]
+    H2 --> I
     C -->|否| J
 
     I --> J{有 parentProvides?}

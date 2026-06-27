@@ -77,71 +77,14 @@ A.num (RefImpl)  ← provide('num', num)
 
 ---
 
-## 3. 為何 valNodeMap 無法處理 inject
+## 3. 本插件的 inject 追蹤邏輯
 
-`valNodeMap: WeakMap<rawObject, GraphNode>`
+> 本插件 provide/inject 追蹤的**完整且最新**說明，正本在 [`docs/tracking/inject.md`](../../docs/tracking/inject.md)。
+> 需要時用 `Read` 載入該檔，**不要在此重複維護**（避免與正本不同步）。
 
-若把 B 的 inject node 存入 `valNodeMap`，key 是同一個 RefImpl：
-- C 執行 inject 時也用同一個 RefImpl 作 key，覆蓋掉 B 的紀錄
-- 後續所有的 `resolveDepNode` 查到的都是 C 的節點，B 的連結全部錯誤
-
----
-
-## 4. 解法：雙 Map 設計
-
-### injectRawToNodeMap（module-level WeakMap）
-
-```
-injectRawToNodeMap: WeakMap<原始RefImpl, GraphNode（子層inject節點）>
-```
-
-- **key**：父層 RefImpl（共用引用，不修改）
-- **value**：子層自己建立的 inject node（但只存最後一個 component 的，用於 prop 連結查找）
-- 深度優先遍歷保證父層先寫，子層 prop 連結時查得到
-- **刻意不寫入 `valNodeMap`**，避免兄弟 component 互蓋
-
-為什麼深度優先有效：遍歷順序是 A → B → C，A 的 inject node 建立時，
-`injectRawToNodeMap` 已經有 provide 來源的 RefImpl 對應到 A 的節點，
-B / C 遍歷時可以查到 A 建立的 inject node 作為 prop 的來源。
-
-### injectRawToLocalNode（per-component local Map）
-
-```
-injectRawToLocalNode: Map<原始RefImpl, GraphNode（本component的inject節點）>
-```
-
-- 每次 `triggerInstance` 重建，只包含當前 component 的 inject nodes
-- `resolveDepNode` **優先查此 Map**，命中即返回正確節點
-- 不跨 component 共享，B 和 C 各自有自己的版本，無污染問題
-
----
-
-## 5. resolveDepNode 查找順序
-
-```
-injectRawToLocalNode.get(target)          // inject（per-component，最優先）
-  ?? valNodeMap.get(target)               // ref / reactive / computed
-  ?? valNodeMap.get(rawSetupState[depName]) // Pinia store fallback
-  ?? propKeyNodeMap.get(target)?.get(key) // props（target 是 rawPropsObj）
-```
-
-inject 必須最優先的原因：shared reference 若落到 `valNodeMap` 層，
-會命中 provide 來源的節點（父層），而非當前 component 的 inject 節點，
-造成依賴邊連到錯誤的 component。
-
----
-
-## 6. provides prototype chain 對追蹤的影響
-
-```ts
-// A provide('num', num)
-// B 沒有 provide，B.provides === A.provides（同一個物件，prototype chain）
-// B.child provide('other', other) → Object.create(A.provides) 才建新物件
-```
-
-遍歷時需要注意：`instance.provides` 可能是祖先的 provides 物件，
-不代表這個 component 有 provide 任何東西。
-判斷是否真正 provide：比較 `instance.provides !== instance.parent?.provides`。
+一句話索引（細節以正本為準）：根本問題是 `inject()` 回傳 shared reference（同一個 RefImpl），`event.target` 無法區分 component。
+解法是 `injectRawToNodeMap`（module-level，key 用共用 RefImpl、value 存子層自己的 inject node）+ `injectRawToLocalNode`（per-component，`resolveDepNode` 優先查）；
+provide 值不在 setupState 時建 anonymous node；判斷某 component 是否真的有 provide 用 `instance.provides !== instance.parent?.provides`（prototype chain）。
 
 ---
 

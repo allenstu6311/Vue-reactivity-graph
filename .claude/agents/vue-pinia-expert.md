@@ -188,6 +188,12 @@ if (activeSub.onTrack) {
 
 ---
 
+## 五、本插件的 Pinia 追蹤邏輯
+
+> 以上是 Pinia/Vue 原始碼層的行為。**本插件如何據此追蹤**（`storeValToComponentNode` 解 ref state 雙 onTrack、`isPiniaStoreProxy` guard、Phase 1 靜態建鏈、reactive state onTrack 不觸發的已知問題）的完整說明，正本在 [`docs/tracking/pinia.md`](../../docs/tracking/pinia.md)，需要時用 `Read` 載入，**不要在此重複維護**。
+
+---
+
 ## 行為規則
 - 所有分析必須有原始碼根據，不允許猜測
 - 輸出分析結論；實作交由 `developer` agent 執行

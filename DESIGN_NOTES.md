@@ -29,6 +29,20 @@
 
 ---
 
+## Sentinel dry-run 的 Symbol 限制（現況）
+
+prop 來源連結**完全依賴父層 dry-run 成功**：`collectProps` 的 `sourceKey` 唯一來源是父層的 `ctx.instanceChildPropKeyMap`（dry-run 結果），沒有任何「繞過 dry-run 的同名直接查找」備援。同名 `:foo="foo"` 與異名 `:foo="bar"` 都先經 dry-run 產出對應表，再依 `sourceKey` 形態解析（`props.xxx` → 父層 `propKeyNodeMap`；其餘 → `parentRawSetupState[sourceKey]` → `valNodeMap`）。
+
+dry-run 把 setupState / props 每個值換成 `Symbol(key)`。Symbol 只撐得住「讀取、`===` / `!==`、`!`、truthy 判斷、`{{ x }}`（走顯式 `String()`）」。下列用法只要出現在 **render 會走到的分支**就會拋錯：
+
+- 把 setupState 函式當函式呼叫（如 i18n `t('key')`）→ `Symbol is not a function`
+- 字串插值 / 拼接（`` `${x}` ``、`'a' + x`）→ `Cannot convert a Symbol value to a string`
+- 算術 / 比較大小（`x + 1`、`x > 0`）→ `Cannot convert a Symbol value to a number`
+
+失敗是**整包**的：render 一拋錯，[sentinel.ts](src/injected/collect/sentinel.ts) 的 `catch {}` 靜默吞掉、`dryRunVNode` 維持 `null`，`traverseVNodeForSentinels` 整個不跑 → **該父層所有直接子元件的 prop 來源全部漏掉**，且 console 無任何錯誤。判斷一個元件會不會踩雷只看它的 `<template>`，與 `<script>`（setup、computed getter）無關，因為 dry-run 只重跑 render，不重跑 setup。
+
+---
+
 ## Inject Anonymous Node 的補票機制
 
 父層 `collectSetupState` 只掃 `setupState`，`provides` 裡來自外部的值不會自動建節點。

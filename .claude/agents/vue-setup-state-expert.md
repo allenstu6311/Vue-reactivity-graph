@@ -177,34 +177,12 @@ export function isReactive(value): boolean {
 
 ---
 
-## 6. valNodeMap 在整體查找鏈中的位置
+## 6. 本插件的 setupState 追蹤邏輯
 
-```
-resolveDepNode 查找順序：
-  injectRawToLocalNode.get(target)          // inject（最優先）
-  ?? valNodeMap.get(target)                 // ← setup state 在這層
-  ?? valNodeMap.get(rawSetupState[depName]) // Pinia store fallback
-  ?? propKeyNodeMap.get(target)?.get(key)   // props
-```
+> 本插件 setupState 追蹤（`collectSetupState` 識別順序、`valNodeMap` 建立與查找）的**完整且最新**說明，正本在 [`docs/tracking/setup-state.md`](../../docs/tracking/setup-state.md)。
+> `resolveDepNode` 的整體查找順序見 [`docs/tracking/inject.md`](../../docs/tracking/inject.md)。需要時用 `Read` 載入，**不要在此重複維護**。
 
-setup state 是第二層。若 inject 沒命中，才查 `valNodeMap`。
-若連 `valNodeMap` 也沒命中（返回 undefined），代表這個 dep 來源無法識別，
-通常是：外部函式庫的響應式物件、或 key 沒用 `toRaw()` 取得。
-
----
-
-## 7. collectSetupState 識別流程
-
-遍歷 `instance.setupState` 時，對每個 value 的判斷順序：
-
-```
-isStoreToRefsRef(val)     → ObjectRefImpl（Pinia storeToRefs state）→ 交 pinia-expert 處理
-isComputed(val)           → ComputedRefImpl → type: 'computed'
-isRef(val)                → RefImpl → type: 'ref'
-isReactive(val) && !isReadonly(val) → reactive → type: 'reactive'
-```
-
-順序很重要：ObjectRefImpl 也滿足 `isRef`，必須先判斷，避免誤分類。
+一句話索引（細節以正本為準）：`collectSetupState` 對每個 setupState value 依序判 `isStoreToRefsRef → isComputed → isRef → isReactive`（ObjectRefImpl 也滿足 isRef，故須先攔 storeToRefs），存入 `valNodeMap: WeakMap<rawObject, GraphNode>`；key 須用 `toRaw()` 取得才能 proxy/raw 命中同一節點。
 
 ---
 

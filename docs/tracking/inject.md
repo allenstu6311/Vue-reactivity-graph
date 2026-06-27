@@ -44,6 +44,18 @@ injectRawToLocalNode.get(target)          // inject（per-component，優先）
 
 ---
 
+## 判斷 component 是否真的有 provide
+
+`provides` 以 prototype chain 實作繼承（`Object.create(parentProvides)`），只在某 component 第一次 `provide()` 時才建立自己的 provides 物件；沒有 provide 的 component，其 `instance.provides` 直接是祖先的同一個物件。
+
+因此遍歷時不能只看「`instance.provides` 有沒有某個 key」（那會把祖先 provide 的誤算成本層）。判斷本層是否真正 provide：
+
+```
+instance.provides !== instance.parent?.provides
+```
+
+---
+
 ## 已知瓶頸
 
 - **provide primitive（string / number / boolean）**：`typeof val !== "object"` 守衛同時過濾 provide 側與 child 側，inject node 不建立。使用者可改用 `ref()` 包裝來繞過。

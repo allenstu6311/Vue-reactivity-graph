@@ -1,8 +1,13 @@
 # Tracking: Props
 
+> 目標：追蹤每個子元件的 prop「來自父層的哪個變數」，畫出 `父層來源 → 子層 prop` 的依賴。
+> 機制：**dry-run（試跑 render）+ value-backed navigating sentinel**。
+
+---
+
 ## 問題一：值被 unwrap，無法當 WeakMap key
 
-Vue 傳遞 props 時，如果值是 ref，子層拿到的是 unwrapped 後的 primitive（`number`、`string`）。
+Vue 傳遞 props 時，若值是 ref，子層拿到的是 unwrapped 後的 primitive（`number`、`string`）。
 Primitive 無法當 WeakMap key，所以不能用值本身來反查節點。
 
 **解法：用 `rawPropsObj` 當容器 key**
@@ -14,69 +19,91 @@ Vue 為每個 component instance 建立唯一的 raw props 物件（`instance.pr
 propKeyNodeMap: WeakMap<rawPropsObj, Map<propName, GraphNode>>
 ```
 
-用容器當外層 key，propName 當內層 key，scope 天然隔離。
+用容器當外層 key、propName 當內層 key，scope 天然隔離。此設計沿用至今。
 
 ---
 
-## 問題二：找不到父層來源（prop 重新命名）
+## 問題二：父層用不同名稱傳 prop / 多層存取 / 整包 v-bind
 
-父層可能用不同名稱傳 prop，例如父層有 `count`，傳給子層的 prop 叫 `value`。
-Strategy 1（同名查找）無法處理這種情況。
+父層可能：
+- 用不同名稱傳（父 `count` → 子 prop `value`）
+- 傳巢狀存取結果（`:test="obj.a.b"`）
+- 整包展開（`<Child v-bind="someObj" />`）
 
-**Strategy 1：同名查找**
+這些都無法用「同名比對」解決，需要實際試跑 render、觀察資料怎麼流進子元件。
 
-prop 名稱與父層 setupState key 相同時，直接從 `parentRawSetupState[propKey]` 查
-`injectRawToNodeMap` 或 `valNodeMap`。
+### 解法：navigating sentinel + dry-run
 
-**Strategy 2：sentinel dry-run（不同名 prop）**
+#### 1. sentinel 是什麼
 
-1. 建立 `sentinelProxy`，讓 setupState 每個 key 的存取回傳唯一 Symbol
-2. 建立 `propsSentinelProxy`，讓 `$props` 每個 key 的存取回傳唯一 Symbol（以 `$prop:` 為前綴存入同一張 `sentinelToKey` map）
-3. 暫時替換 `instance.setupState = sentinelProxy`，呼叫 `render()` 做 dry-run
-4. `traverseVNodeForSentinels` 掃 VNode tree，找子元件 props 中值為 Symbol 的項目
-5. 建立對應表：`childComponentType → propName → parentKey`，存入 `instanceChildPropKeyMap`
-6. dry-run 結束後立刻還原 `instance.setupState`
+`createSentinel(chain, rootKey)`（`collect/sentinel.ts`）建立一個 **callable Proxy**，當作「追蹤標記」：
 
-Strategy 2 查找時依前綴決定來源：
-- 無前綴 → 父層 setupState，走 `injectRawToNodeMap` 或 `valNodeMap`
-- `$prop:` 前綴 → 父層 props，走 `propKeyNodeMap`
+- `chain`：從根走到目前，沿路經過的**真實值**清單（如 `[objProxy, {b:20}, 20]`）。
+- `rootKey`：最初從哪個 key 出發（setup key 名，或 props 轉傳時的 `props.xxx`）。
+- **get trap**：往下導航——讀 `tip` 的某個 key，把取到的真實值接進 chain，回傳新 sentinel，支援 `a.b.c` 多層存取。
+- **apply trap**：被當函式呼叫（如模板 `t(...)`）時回傳空 chain 的 sentinel——不 crash，且函式回傳值不誤連回原變數。
+- 防偽裝：所有 `__v_*` 鍵、`__isSuspense`/`__isTeleport` 回 `undefined`（否則 Vue 的 `guardReactiveProps`/`createVNode` 會把 sentinel 當 reactive props 處理，破壞 Branch A）；`Symbol.toPrimitive` 回 `""`（被字串化時不爆）；讀 ref/computed 的 `.value` 回自己（不觸發 getter）。
 
-**sentinel dry-run 的觸發原理**
+每個 sentinel 連同它的 `{ chain, rootKey }` 存進 module 級的 `sentinelRegistry`（WeakMap），供 `isSentinel()` 認身分、取回來源鏈。
 
-render 函數透過兩條路存取 setupState：
-- `$setup.xxx`（render 函數第 4 個參數直接是 `sentinelProxy`）
-- `_ctx.xxx`（Vue component proxy 內部查找時讀 `instance.setupState`，已被替換為 `sentinelProxy`）
+> **崩潰免疫**：sentinel 可讀（回 sentinel）、可呼叫（apply）、可字串化（`""`），任何存取都不丟錯。
+> 舊版 sentinel 是 Symbol，模板若有 `t(...)` 之類的呼叫會 `TypeError`，導致整個父層 dry-run 中斷、所有 prop 來源全失蹤；navigating sentinel 順帶解掉此 crash。
 
-兩條路都會命中 sentinel proxy 的 `get` trap，回傳 Symbol。
+#### 2. dry-run 流程
+
+`runSentinelDryRun`（`collect/sentinel.ts`）：
+
+1. 建 `sentinelSetupProxy` 替換 `instance.setupState`：讀任一 key → 回 `createSentinel([rawSetupState[key]], key)`。
+2. 建 `sentinelPropsProxy` 替換 `instance.props`：讀任一 prop → 回 `createSentinel([target[key]], 'props.' + key)`。
+   （讀 `target[key]`，即建 proxy 時捕獲的原始 props，不可讀已被換掉的 `instance.props`，否則無限遞迴。）
+3. 暫時替換、呼叫 `render()` 做 dry-run，`try/finally` 確保**一定還原** `setupState`/`props`（破壞 finally 會讓 Vue 響應式永久錯亂）。
+4. `traverseVNodeForSentinels` 掃 dry-run 產出的 VNode 樹，撈出「子元件 prop ← 來源」。
+
+> **執行時機**：dry-run 必須排在 `collectInject` + `collectSetup` **之後**（`walker.ts` 的 `collectInstance`），
+> 因為 `resolveChain` 要查 `valNodeMap` / `propSourceInjectMap`，這兩張表得先由那兩個 collector 填好。
+
+#### 3. 掃 VNode 樹：`traverseVNodeForSentinels`
+
+對每個有 `type` 與 `props` 的 vnode：
+
+- **還原子組件身分**（`resolvedComponent`）：`vnode.type` 可能是 sentinel（`<component :is>` 來自 setup）、字串（全域元件如 `el-table`，需從 `appContext` 查回物件）或已是物件，統一還原成 component 物件，才能與子層 `instance.type` 對應。
+- **Branch A — `isSentinel(vnode.props)`**：`<Child v-bind="someObj" />`，整包 props 是單一 sentinel，不能 `Object.entries`。把 sentinel 背後物件讀出來（此處刻意 `unref` 一次才有 key 可列舉），逐 `innerKey` 用 `resolveChain([innerVal], "")` 反查來源。
+- **Branch B — 一般情形**：`<Child :count="count" />`，逐一檢查每個 prop 值是否為 sentinel，是則 `resolveChain(chain, rootKey)`。
+
+`resolveChain(chain, rootKey)` 從 chain **尾到根**掃，對每個物件層 `getRaw` 後查 `propSourceInjectMap ?? valNodeMap`，第一個命中的節點即來源。找到 → 存 `node.id`；找不到 → 存 `rootKey`（留給 collectProps 後手，見下）。
+
+#### 4. 結果結構：`instanceChildPropKeyMap`
+
+dry-run 結果寫進：
+
+```
+instanceChildPropKeyMap: WeakMap<父instance, dryRunChildPropMap>
+  dryRunChildPropMap:     Map<子組件物件, { maps: Map<propName, 來源>[]; nextIndex }>
+```
+
+- 外層 key 是子組件物件，回答「哪一種子組件」。
+- `maps[]` + `nextIndex`：同型子組件並排出現（`<Child/><Child/>`）時，各實例疊一張 propMap，靠 `nextIndex` 游標對位（消費端見下）。
+- 最內層 `Map<propName, 來源>`：來源是 `node.id`（resolveChain 命中）或 `rootKey`（未命中）。
 
 ---
 
-## Strategy 3：v-bind 整包展開（Branch A）
+## 子層消費：`collectProps`
 
-當模板寫 `<HomeView v-bind="someObj" />` 時，Vue compiler 直接把 `_ctx.someObj` 當成整個 `props` 傳入，dry-run 後 `vnode.props` 本身就是一個 sentinel Symbol（`Symbol(someObj)`），無法 `Object.entries`，Strategy 1 / Strategy 2 均失效。
+`collect/props.ts` 走到真正的子元件實例時：
 
-**解法：rawSetupState 反查表**
+1. 建本層每個 prop 節點，掛進 `propNodeMap`（→ `propKeyNodeMap`）、`nodes[]`、`nodeIdMap`。
+2. 從父層的 `instanceChildPropKeyMap` 取出本型子組件的 `siblingPropMaps`，用 `nextIndex` 領到本實例那張 `maps[instanceOrdinal]`，查得 `sourceKey`。
+3. 依 `sourceKey` 連結父層節點：
+   - **主路徑**：`sourceKey` 是 node.id → `ctx.nodeIdMap.get(sourceKey)` 直接拿到父層節點。
+   - **props 轉傳分支**：`sourceKey` 以 `props.` 開頭（父層把自己的 prop 再往下傳，如 `<Child :value="this.count" />` 而 `count` 是父層的 prop）→ 切掉前綴，查父層 **`propKeyNodeMap`** 的 prop 節點。
+     （prop 傳下來是 unwrap 後的 primitive，在 `valNodeMap` 無 identity，resolveChain 必然失敗，故走 rootKey `props.xxx` 由此分支接住——這是 prop→prop 轉傳的唯一機制。）
 
-1. 偵測到 `typeof vnode.props === 'symbol' && sentinelToKey.has(vnode.props)` → `sourceKey = 'someObj'`
-2. 建立反查表：遍歷 `rawSetupState`（排除 `sourceKey` 自身），`value → varName`
-3. `rawSourceObj = getRaw(unref(sourceVal))` 取得要展開的物件：
-   - `unref`（複用自 `helper/nodes.ts`）先把來源解包成裡面的物件——plain ref 讀 `._value`（不觸發 reactivity）、computed 讀 `.value`（觸發 getter），純物件則原樣回傳
-   - `getRaw` 再剝一層 `__v_raw`，繞過 reactive proxy 取底層 plain object
-4. 對每個 `innerKey`：`reverseMap.get(rawSourceObj[innerKey])` 取得 `sourceVarName`
-5. `propMap.set(innerKey, sourceVarName)`（格式與 Strategy 2 相同，子層解析邏輯零修改）
-
-**關鍵前提**：`toRaw(reactive({ text: num })).text === num`（RefImpl 本身），`rawSetupState` 也直接儲存 RefImpl，兩者是同一個物件引用，反查可命中。
-
-**來源為 ref / computed**：先 `unref` 解包成裡面的物件再展開內層。
-- `computed(() => ({ test: num }))`：解包後內層 `test` 仍持有 RefImpl `num`，identity 命中 → 建立 `test → num` 連結。
-- `computed(() => ({ amount: someRef.value }))`：解包後內層是 primitive（`100`），不在 `reverseMap` 裡 → 反查不到，靜默跳過。
-
-找不到來源時一律靜默跳過（已知限制，不噴 warn、不拋例外）。
+> **已停用（保留註解未刪）**：舊式「同名反查」後備——`sourceKey` 為純名字時，用 `parentRawSetupState[sourceKey]` 查 `valNodeMap`。
+> 在現行順序下 resolveChain 對所有 setup 來源都會成功並存 node.id，此後備永不命中（實測停用後測試全綠），屬防禦性殘留。
 
 ---
 
 ## 已知瓶頸
 
-- **Prop → prop 的 sentinel**：只有 `$props.xxx` 的存取路徑能被 `propsSentinelProxy` 攔截，若 render 函數透過 `_ctx.xxx` 存取 prop（不同編譯模式），sentinel 無法捕捉。
-- **`v-bind="someObj"` 巢狀結構**：Strategy 3 只處理一層展開，若 `someObj` 的 value 是另一個 reactive 物件，不遞迴追蹤。
-- **多個 `v-bind` 展開**：`<Child v-bind="a" v-bind="b" />` 時 Vue 以 `mergeProps` 合併，`vnode.props` 是合併後物件而非 Symbol，Strategy 3 不觸發，改由 Strategy 2 處理（各 key 的值仍是 sentinel Symbol）。
+- **`v-bind="someObj"` 巢狀結構**：Branch A 只處理一層展開，若 `someObj` 的 value 是另一個 reactive 物件，不遞迴追蹤。
+- **多個 `v-bind` 展開**：`<Child v-bind="a" v-bind="b" />` 時 Vue 以 `mergeProps` 合併，`vnode.props` 是合併後的一般物件而非單一 sentinel，Branch A 不觸發，改由 Branch B 逐 key 處理（各 key 的值仍是 sentinel）。

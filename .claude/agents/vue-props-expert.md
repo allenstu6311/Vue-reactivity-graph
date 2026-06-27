@@ -205,43 +205,13 @@ export function normalizePropsOptions(comp, appContext, asMixin = false): Normal
 
 ## 5. 本插件的 props 追蹤邏輯
 
-### 問題一：值被 unwrap，無法當 WeakMap key
-ref 傳為 prop 時，子層拿到 primitive（unwrapped）。
-**解法**：用 `rawPropsObj`（`toRaw(instance.props)`）當容器 key：
-```
-propKeyNodeMap: WeakMap<rawPropsObj, Map<propName, GraphNode>>
-```
-`onTrack` 觸發時 `event.target = rawPropsObj`，per-instance 唯一。
+> 本插件 prop 來源追蹤的**完整且最新**說明，正本在 [`docs/tracking/props.md`](../../docs/tracking/props.md)。
+> 需要時用 `Read` 載入該檔，**不要在此重複維護**（避免再次與正本不同步）。
 
-### 問題二：prop 重新命名
-
-**Strategy 1（同名）**：`parentRawSetupState[propKey]` 直接查 `valNodeMap`
-
-**Strategy 2（sentinel dry-run）**：
-1. 建立 `sentinelProxy`，每個 key 的存取回傳唯一 Symbol
-2. 建立 `propsSentinelProxy`，`$props` 每個 key 回傳 `$prop:` 前綴的 Symbol
-3. 暫時替換 `instance.setupState = sentinelProxy`，呼叫 `render()` dry-run
-4. 掃 VNode tree，找子元件 props 中值為 Symbol 的項目
-5. 建立 `childComponentType → propName → parentKey` 對應表，存入 `instanceChildPropKeyMap`
-6. dry-run 結束後立刻還原 `instance.setupState`
-
-render 存取 setupState 的兩條路都命中 sentinelProxy：
-- `$setup.xxx`（render 第 4 個參數直接是 sentinelProxy）
-- `_ctx.xxx`（component proxy 內部讀 `instance.setupState`，已被替換）
-
-### Strategy 3：v-bind 整包展開
-
-當模板寫 `<HomeView v-bind="someObj" />` 時，`vnode.props` 本身是一個 sentinel Symbol，無法 `Object.entries`，Strategy 1 / 2 均失效。
-
-解法：偵測到 `typeof vnode.props === 'symbol'` → 從 `sentinelToKey` 取得 `sourceKey`（`'someObj'`）→ 遍歷 `rawSetupState` 建反查表（`value → varName`）→ 對每個 `innerKey` 用 `reverseMap.get(rawSourceObj[innerKey])` 取得 `sourceVarName` → 寫入 `propMap`，格式與 Strategy 2 相同，子層解析邏輯零修改。
-
-**關鍵前提**：`toRaw(reactive({ text: num })).text === num`（RefImpl 本身），`rawSetupState` 直接儲存 RefImpl，同一物件引用，反查可命中。找不到來源時 `console.warn` 並靜默跳過。
-
-### 已知瓶頸
-- dry-run render 回傳非 VNode → Strategy 2 失效，靠 Strategy 1 補救
-- `_ctx.xxx` 存取 prop → propsSentinelProxy 無法攔截
-- `v-bind="someObj"` 巢狀結構：Strategy 3 只處理一層展開，若 `someObj` 的 value 是另一個 reactive 物件，不遞迴追蹤
-- 多個 `v-bind` 展開（`<Child v-bind="a" v-bind="b" />`）：Vue 以 `mergeProps` 合併，`vnode.props` 是合併後物件而非 Symbol，Strategy 3 不觸發，改由 Strategy 2 處理
+一句話索引（細節以正本為準）：機制是 **dry-run（試跑 render）+ value-backed navigating sentinel**；
+`rawPropsObj` 當 `propKeyNodeMap` 的 key、sentinel 帶 `chain`/`rootKey` 並存於 `sentinelRegistry`、
+`traverseVNodeForSentinels` 掃 VNode 樹（Branch B 逐 prop / Branch A v-bind 整包）、
+結果存 `instanceChildPropKeyMap`、collectProps 主路徑查 `nodeIdMap`、prop 轉傳走 `props.` 前綴查父層 `propKeyNodeMap`。
 
 ## 行為規則
 - 輸出分析結論；實作交由 `developer` agent 執行
