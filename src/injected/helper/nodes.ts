@@ -1,5 +1,6 @@
 import type { GraphNode, NodeType } from "../../graph";
 import type { ReactiveTarget } from "../../types/vue-internals";
+import type { WalkContext } from "../context/WalkContext";
 import { isObject } from "@/shared/helper/guards";
 
 const MAX_DEPTH = 20
@@ -72,6 +73,15 @@ export function detectNodeType(val: ReactiveTarget): NodeType | null {
   if (val?.__v_isRef) return "ref";
   if (val?.__v_isReactive) return "reactive";
   return null;
+}
+
+export function registerNode(
+  nodes: GraphNode[],
+  ctx: WalkContext,
+  node: GraphNode,
+): void {
+  nodes.push(node);
+  ctx.nodeIdMap.set(node.id, node);
 }
 
 export const isStoreNode = (node: GraphNode): boolean => node.type === "store";

@@ -32,21 +32,23 @@ export function collectInstance({
   const { key, path } = ctx.resolveComponentKey(parent?.path, name, instance.uid);
   const nodes: GraphNode[] = [];
 
-  // 1. run sentinel dry-run（寫入 ctx.instanceChildPropKeyMap，子層 collectProps 會讀）
-  runSentinelDryRun({ instance, rawSetupState, propsOptions, ctx });
-
-  // 2. collect props（Strategy 1 / 2 來源連結）
+  // 1. collect props（Strategy 1 / 2 來源連結）
+  // 注：本 instance 的 collectProps 消費父層的 instanceChildPropKeyMap，不依賴本層 dry-run
   collectProps({ instance, uid: instance.uid, name, path, filePath, nodes, ctx, propsOptions, parentRawSetupState });
 
-  // 3. collect inject（回傳 injectKeySet 供 setup 跳過同名 key）
+  // 2. collect inject（回傳 injectKeySet 供 setup 跳過同名 key）
   const injectKeys = collectInject({ instance, uid: instance.uid, name, path, parent, filePath, nodes, ctx, rawSetupState });
 
-  // 5. collect setup state（跳過 inject keys）
+  // 3. collect setup state（跳過 inject keys）
   const storeValToComponentNode = new Map<object, GraphNode>();
-  collectSetup({ rawSetupState, uid: instance.uid, name, path, filePath, nodes, valNodeMap: ctx.valNodeMap, skipKeys: injectKeys, storeValToComponentNode });
+  collectSetup({ rawSetupState, uid: instance.uid, name, path, filePath, nodes, valNodeMap: ctx.valNodeMap, skipKeys: injectKeys, storeValToComponentNode, ctx });
 
-  // 6. collect watch
-  collectWatch({ instance, uid: instance.uid, name, path, filePath, nodes, watchEffects });
+  // 4. collect watch
+  collectWatch({ instance, uid: instance.uid, name, path, filePath, nodes, watchEffects, ctx });
+
+  // 5. run sentinel dry-run（移到 collectInject + collectSetup 之後，此時 valNodeMap/propSourceInjectMap 已就緒）
+  // 寫入 ctx.instanceChildPropKeyMap，供子層 collectProps 讀取
+  runSentinelDryRun({ instance, rawSetupState, propsOptions, ctx });
 
   updateComponent(key, { uid: instance.uid, parentUid: parent?.uid, name, path, filePath });
   updateNodes(key, nodes);
@@ -164,7 +166,7 @@ export function runScan(root: ExtendedComponentInstance, ctx: WalkContext): void
 
   const pinia = root.appContext?.app?.config?.globalProperties?.$pinia as PiniaInstance | undefined
   if (pinia) {
-    const storeGroups = collectPiniaState(pinia, ctx.valNodeMap)
+    const storeGroups = collectPiniaState(pinia, ctx.valNodeMap, ctx)
     for (const [storeId, nodes] of Object.entries(storeGroups)) {
       updateStore(storeId, nodes)
     }

@@ -1,13 +1,14 @@
 import type { CollectWatchParams } from "./types";
-import { createNode } from "../helper/nodes";
+import type { WalkContext } from "../context/WalkContext";
+import { createNode, registerNode } from "../helper/nodes";
 
-export function collectWatch(params: CollectWatchParams): void {
-  const { instance, uid, name, path, filePath, nodes, watchEffects } = params;
+export function collectWatch(params: CollectWatchParams & { ctx: WalkContext }): void {
+  const { instance, uid, name, path, filePath, nodes, watchEffects, ctx } = params;
 
   if (!watchEffects || watchEffects.length === 0) return;
 
   watchEffects.forEach((_effect, index: number) => {
-    nodes.push(createNode({
+    const watchNode = createNode({
       id: `${uid}.w_${index}`,
       uid,
       name,
@@ -16,6 +17,7 @@ export function collectWatch(params: CollectWatchParams): void {
       type: "watch",
       val: null,
       filePath,
-    }));
+    });
+    registerNode(nodes, ctx, watchNode);
   });
 }

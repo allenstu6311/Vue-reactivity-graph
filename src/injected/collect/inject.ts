@@ -1,7 +1,7 @@
 import type { CollectInjectParams } from "./types";
 import type { GraphNode } from "../../graph";
 import { getGraphData } from "../../graph";
-import { createNode } from "../helper/nodes";
+import { createNode, registerNode } from "../helper/nodes";
 import { linkNodes } from "../subscribers/shared";
 import { isObject, isSymbol } from "@/shared/helper/guards";
 import { getInstanceName } from "../helper/componentName";
@@ -63,6 +63,7 @@ export function collectInject(params: CollectInjectParams): Set<string> {
       // 只能 append，不能用 updateNodes（會覆蓋父層已有的節點）
       getGraphData().nodes[parent!.uid.toString()]?.push(parentNode);
       ctx.valNodeMap.set(rawOrVal, parentNode);
+      ctx.nodeIdMap.set(parentNode.id, parentNode);
     }
 
     provideRawToNode.set(val, parentNode);
@@ -87,7 +88,7 @@ export function collectInject(params: CollectInjectParams): Set<string> {
         filePath,
       });
       linkNodes(parentNode, injectNode);
-      nodes.push(injectNode);
+      registerNode(nodes, ctx, injectNode);
       const injectRaw = (val as any).__v_raw ?? val;
       ctx.propSourceInjectMap.set(injectRaw as object, injectNode);
     }

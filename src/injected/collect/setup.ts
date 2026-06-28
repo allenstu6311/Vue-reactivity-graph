@@ -3,24 +3,29 @@ import type {
   ReactiveTarget,
   PiniaInstance,
 } from "../../types/vue-internals";
-import { detectNodeType, createNode, setValNode } from "../helper/nodes";
+import { detectNodeType, createNode, setValNode, registerNode } from "../helper/nodes";
 import { isStoreToRefsRef, isPiniaStoreProxy } from "../helper/resolve";
 import { linkNodes } from "../subscribers/shared";
 import type { CollectSetupParams } from "./types";
+import type { WalkContext } from "../context/WalkContext";
 import { isObject } from "@/shared/helper/guards";
 
 // Phase 1: 建 node、存 valNodeMap
-export function collectSetup({
-  rawSetupState,
-  uid,
-  name,
-  path,
-  filePath,
-  nodes,
-  valNodeMap,
-  skipKeys,
-  storeValToComponentNode,
-}: CollectSetupParams): void {
+export function collectSetup(
+  params: CollectSetupParams & { ctx: WalkContext }
+): void {
+  const {
+    rawSetupState,
+    uid,
+    name,
+    path,
+    filePath,
+    nodes,
+    valNodeMap,
+    skipKeys,
+    storeValToComponentNode,
+    ctx,
+  } = params;
   for (const key in rawSetupState) {
     if (key === "props") continue;
     if (skipKeys?.has(key)) continue; // inject keys — already built by collectInject
@@ -49,7 +54,7 @@ export function collectSetup({
         linkNodes(storeNode, componentNode);
         storeValToComponentNode.set(storeVal as object, componentNode);
         valNodeMap.set(trackedVal, componentNode);
-        nodes.push(componentNode);
+        registerNode(nodes, ctx, componentNode);
       }
       continue;
     }
@@ -58,13 +63,14 @@ export function collectSetup({
     if (!type) continue;
     const node = createNode({ id: `${uid}.${key}`, varName: key, type, val: trackedVal, filePath, name, uid, path });
     setValNode(valNodeMap, trackedVal, node);
-    nodes.push(node);
+    registerNode(nodes, ctx, node);
   }
 }
 
 export function collectPiniaState(
   pinia: PiniaInstance,
   valNodeMap: WeakMap<object, GraphNode>,
+  ctx: WalkContext,
 ): Record<string, GraphNode[]> {
   const storeGroups: Record<string, GraphNode[]> = {};
   if (!pinia?._s) return storeGroups;
@@ -88,6 +94,7 @@ export function collectPiniaState(
       });
       setValNode(valNodeMap, val, node);
       storeNodes.push(node);
+      ctx.nodeIdMap.set(node.id, node);
     }
     if (storeNodes.length > 0) {
       storeGroups[storeId] = storeNodes;
