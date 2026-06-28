@@ -14,18 +14,18 @@ export function collectProps(params: CollectPropsParams): void {
   const rawPropsObj = ((instance.props as any).__v_raw ??
     instance.props) as object;
   /**
-   * 【組3 本層名冊】本實例的 propName → **prop 節點(GraphNode)**。
+   * 【本層名冊】本實例的 propName → **prop 節點(GraphNode)**。
    * 先空著掛進 `ctx.propKeyNodeMap`（傳參考），下方迴圈再逐一填入；供 Phase 2 onTrack 反查。
    */
   const propNodeMap = new Map<string, GraphNode>();
   ctx.propKeyNodeMap.set(rawPropsObj, propNodeMap);
 
-  /** 【組2 偵察情報】父層 dry-run 結果（= sentinel.ts 的 `dryRunChildPropMap`），以父 instance 取出。 */
+  /** 【偵察情報】父層 dry-run 結果（= sentinel.ts 的 `dryRunChildPropMap`），以父 instance 取出。 */
   const parentSentinelResult = instance.parent
     ? ctx.instanceChildPropKeyMap.get(instance.parent)
     : undefined;
 
-  /** 【組2 偵察情報】本型子組件的多實例容器 `{ maps[], nextIndex }`；`maps[instanceOrdinal]` 是本實例那張 (propName→來源id)。 */
+  /** 【偵察情報】本型子組件的多實例容器 `{ maps[], nextIndex }`；`maps[instanceOrdinal]` 是本實例那張 (propName→來源id)。 */
   const siblingPropMaps = parentSentinelResult?.get(
     instance.type as unknown as object,
   );

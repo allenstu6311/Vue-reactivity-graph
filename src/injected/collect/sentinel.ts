@@ -127,7 +127,7 @@ function traverseVNodeForSentinels(
     }
     // 形式3：已是 component 物件 → 直接進來撈 prop 來源
     if (isObject(resolvedComponent)) {
-      /** 【組2 偵察情報】單一子組件實例的 propName → **來源 id 字串**（如 `'5.obj'`），稍後疊進 `dryRunChildPropMap.maps[]`。 */
+      /** 【偵察情報】單一子組件實例的 propName → **來源 id 字串**（如 `'5.obj'`），稍後疊進 `dryRunChildPropMap.maps[]`。 */
       const propSourceMap = new Map<string, string>();
 
       if (isSentinel(vnode.props)) {
@@ -293,7 +293,7 @@ export function runSentinelDryRun(params: SentinelDryRunParams): void {
 
   if (dryRunVNode) {
     /**
-     * 【組2 偵察情報】本父層 dry-run 結果：子組件物件 → `{ maps[]：同型多實例各一張 (propName→來源id); nextIndex }`。
+     * 【偵察情報】本父層 dry-run 結果：子組件物件 → `{ maps[]：同型多實例各一張 (propName→來源id); nextIndex }`。
      * 掃完整棵 VNode 樹後，存進 `ctx.instanceChildPropKeyMap`（以此 instance 為 key）供子層 collectProps 讀取。
      */
     const dryRunChildPropMap = new Map<
