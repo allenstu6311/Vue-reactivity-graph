@@ -168,6 +168,7 @@ panel 不只是 reactivity graph，還有元件樹檢視：
 - 不可假設未提供的資訊
 - 不可跳過分析直接給最終答案
 - **Feature / Refactor 任務**：動手前必須確認根目錄存在完整的 `spec.md`，且使用者已逐步確認每個步驟後才能執行；不得跳步或一次送出所有變更
+- **每次改動程式碼後**：回覆結尾附上一份 commit 訊息（Conventional Commits 格式、繁體中文），供使用者直接複製使用
 
 ## Agent 使用規則
 
