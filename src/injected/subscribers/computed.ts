@@ -1,7 +1,8 @@
-import type { ComputedRefImpl } from "../../types/vue-internals"
+import type { ComputedRefImpl, PiniaInstance } from "../../types/vue-internals"
 import type { BindComputedTrackParams } from "./types"
 import { createOnTrackHandler } from "./shared"
 import { isStoreNode } from "../helper/nodes"
+import type { GraphNode } from "../../graph"
 
 function markComputedDirtyAndEval(val: ComputedRefImpl): void {
   val.flags |= 1 << 4
@@ -43,4 +44,30 @@ export function bindComputedTrack({
       markComputedDirtyAndEval(computedImpl)
     }
   }
+}
+
+export function bindPiniaGetterTrack(
+  pinia: PiniaInstance,
+  valNodeMap: WeakMap<object, GraphNode>,
+): void {
+  pinia._s?.forEach((store) => {
+    const raw = store.__v_raw ?? store
+    for (const key in raw) {
+      const val = raw[key]
+      const computedImpl = val as unknown as ComputedRefImpl
+      if (!computedImpl?.effect) continue
+      const subNode = valNodeMap.get(computedImpl as object)
+      if (!subNode) continue
+
+      computedImpl.onTrack = createOnTrackHandler(subNode, subNode.id, {
+        rawSetupState: {},
+        valNodeMap,
+        propKeyNodeMap: new WeakMap(),
+        injectRawToLocalNode: new Map(),
+        storeValToComponentNode: new Map(),
+      }, { guardSelf: true }) as any
+
+      markComputedDirtyAndEval(computedImpl)
+    }
+  })
 }

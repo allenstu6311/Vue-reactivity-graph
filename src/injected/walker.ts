@@ -3,7 +3,7 @@ import type {
   ExtendedComponentInstance,
   PiniaInstance,
 } from "../types/vue-internals";
-import { bindComputedTrack } from "./subscribers/computed";
+import { bindComputedTrack, bindPiniaGetterTrack } from "./subscribers/computed";
 import { bindWatchTrack } from "./subscribers/watch";
 import { isStoreToRefsRef } from "./helper/resolve";
 import { GraphNode, updateComponent, updateNodes, updateStore, getGraphData, clearGraph } from "../graph";
@@ -170,6 +170,8 @@ export function runScan(root: ExtendedComponentInstance, ctx: WalkContext): void
     for (const [storeId, nodes] of Object.entries(storeGroups)) {
       updateStore(storeId, nodes)
     }
+    // Phase 2：store getter 的 onTrack 綁定，需在所有 store 節點登記完成後執行
+    bindPiniaGetterTrack(pinia, ctx.valNodeMap)
   }
   // Phase 1: 建節點
   collectInstance({ rawInstance: root, ctx })
